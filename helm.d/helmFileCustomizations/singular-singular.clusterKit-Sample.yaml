@@ -1,0 +1,204 @@
+# Default values for ascp-dart-prime.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+#
+# Settings that need to be customized by the customer are marked with 'CUSTOMIZE_ME' comments
+#
+global:
+  # customer:
+  #   certificate:
+  #     ingress:
+  #       # CUSTOMIZE_ME:
+  #       # Indication whether to use a customer given certificate as the applicable external (out-of-cluster) micro services ingresses certificates, or not
+  #       enabled: false
+  #       secret:
+  #         data:
+  #           # CUSTOMIZE_ME:
+  #           # The customer's supplied certificate authority (CA) signing certificate of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
+  #           caCrtAsBase64: ''
+  #           # CUSTOMIZE_ME:
+  #           # The customer's supplied public key of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
+  #           tlsCrtAsBase64: ''
+  #           # CUSTOMIZE_ME:
+  #           # The customer's supplied private key of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
+  #           tlsKeyAsBase64: ''
+  workload:
+    dockerPrivateRegistry:
+      secret:
+        enabled: true
+        name: ascp-docker-registry-secret
+        data:
+          # Auto generated Docker private registry user credentials configuration
+          jsonConfigAsBase64: ""
+  storage:
+    pvc:
+      linux:
+        enabled: true
+        # The customer's K8S storage driver access mode
+        #   NOTE: Set on 'ReadWriteMany' and should not be changed
+        accessMode: ReadWriteMany
+        # CUSTOMIZE_ME:
+        # The customer's K8S storage driver class name
+        #   NOTE: The CSI driver must support 'ReadWriteMany' access mode
+#       storageClassName: freenas-nfs-csi
+        storageClassName: longhorn
+        # CUSTOMIZE_ME:
+        # The customer's K8S predefined PV (Persistent Volume), to be used with the auto-generated PVC (Persistent Volume Claim) for the shared file system
+        #   NOTES:
+        #   1. This field is optional, if left empty, the designated PV will be generated automatically by the PVC
+        #   2. This ability is generally used in case migrating from the Windows VM based version of AppScan 360°, and there is a need to keep the existing (shared) data
+        #   3. Note: In case the PV is NOT intended to be associated with any storage class, do the following:
+        #     3.1 The storage class name parameter (CK_CSI_STORAGE_CLASS_NAME) should be set to a pseudo one (e.g., 'manual')
+        #     3.2 The PV should be set in the same way (regarding its storage-class parameter) as the PVC
+        volumeName: null
+        # CUSTOMIZE_ME:
+        # The customer's K8S shared storage designated size, to be calculated before installation, following the calculation logic outlined in the formal documentation
+        requestedCapacity: 50Gi
+  ca:
+    seed:
+      enabled: true
+      issuer:
+        name: appscan-seed-ca-clusterissuer
+        kind: ClusterIssuer
+    root:
+      secret:
+        data:
+          # Auto generated root CA certificate
+          tlsCrtAsBase64: null
+          # Auto generated root CA private key
+          tlsKeyAsBase64: null
+      certificate:
+        name: appscan-root-ca-cert
+        duration: 26280h0m0s # 3 years
+        renewBefore: 8760h0m0s # 1 year
+  # ingress:
+  #   controller:
+  #     capabilities:
+  #       # CUSTOMIZE_ME:
+  #       # Indicates whether the Ingress Controller is based on NGINX, or the SSL onload (HTTPS backend protocol) is supported by the ingress controller (not via an annotation, but by the controller itself!), or not
+  #       isHttpsBackendProtocolSupported: true
+  #   internal:
+  #     # CUSTOMIZE_ME:
+  #     # The ingress class name to be used when deploying ingresses into the customer's K8S cluster
+  #     class: nginx
+  #     host:
+  #       # CUSTOMIZE_ME:
+  #       # The (main) domain to be used when deploying ingresses into the customer's K8S cluster (for building the host name)
+  #       #   NOTE: If left empty, it will be taken from the 'global.network.domainSuffix' field
+  #       domain: appscan.com
+  #       # CUSTOMIZE_ME:
+  #       # The sub domain to be used when deploying ingresses into the customer's K8S cluster (for building the host name)
+  #       subDomain: as360
+  network:
+    # CUSTOMIZE_ME:
+    # The customer's designated (main) domain name
+    domainSuffix: appscan.com
+  configuration:
+    disclosed:
+      # CUSTOMIZE_ME:
+      # AS360 frontend URL (of the UI)
+      #   NOTE: The URL must NOT have a trailing '/' at the end of the URL (A valid example: 'https://mydomain.server.com', an invalid example: 'https://mydomain.server.com/')
+      siteUrl: ''
+      # CUSTOMIZE_ME:
+      # The customer's LDAP server/service domain
+      ldapDomain: ''
+      # CUSTOMIZE_ME:
+      # The customer's LDAP server/service user name (for establishing connection)
+      #   NOTE: Relevant IFF 'ManualOnboard' is selected for the 'global.configuration.externalIDPMode' parameter
+      ldapUsername: ''
+      # CUSTOMIZE_ME:
+      # The customer's list of LDAP groups (comma-separated) that are authorized to access the AppScan 360°
+      #   NOTE: Relevant IFF 'GroupsAccess' is selected for the 'global.configuration.externalIDPMode' parameter
+      ldapAuthorizedGroups: ''
+      # CUSTOMIZE_ME:
+      # Indicates whether to establish a secured (over SSL/TLS) connection towards the customer's LDAP server/service, or not
+      #   NOTE: Valid values are 'True' or 'False'
+      ldapSsl: ''
+      # CUSTOMIZE_ME:
+      # The customer's designated location of the users in the its AD (Active Directory) for LDAP queries, it is used to authenticate AD users during login to AppScan 360°
+      ldapTargetOU: ''
+      # CUSTOMIZE_ME:
+      # The customer's SMTP mail server/service host name
+      mailSmtpHost: ''
+      # CUSTOMIZE_ME:
+      # The customer's SMTP mail server/service port
+      mailSmtpPort: ''
+      # CUSTOMIZE_ME:
+      # The customer's SMTP mail server/service user name (for establishing connection)
+      mailSmtpUserName: ''
+      # CUSTOMIZE_ME:
+      # Indicates whether to establish a secured (over SSL/TLS) connection towards the customer's SMTP mail server/service, or not
+      #   NOTE: Valid values are 'True' or 'False'
+      mailSmtpEnableSsl: ''
+      # CUSTOMIZE_ME:
+      # Define your method for onboarding new users:
+      #   AutoOnboard: Any user with access to the server can log in to AppScan 360°.
+      #   GroupsAccess: Any user in an authorized group (defined below) can log in to AppScan 360°.
+      #   ManualOnboard: Users must be invited using the Add Users button on the Access management > Users page.
+      externalIDPMode: ''
+      # CUSTOMIZE_ME:
+      # Optional set of parameters, to be used IFF the customer has a dedicated upstream proxy (used to enable Internet access from within the customer's network),
+      # holding the customer's upstream proxy settings (for establishing connection), if applicable.
+      #   NOTES:
+      #     1.If used, the customer's upstream proxy needs to be configured to allow egress (outgoing) traffic to the following sites:
+      #       (-) hclsoftware.compliance.flexnetoperations.com
+      #     2. Currently there is NO support using a script to configure the upstream proxy settings
+      # The customer's upstream proxy host (an optional parameter, to be used IFF the customer has a dedicated upstream proxy)
+      upstreamProxyHost: ''
+      # CUSTOMIZE_ME:
+      # The customer's upstream proxy port (an optional parameter, to be used IFF the customer has a dedicated upstream proxy)
+      upstreamProxyPort: ''
+      # CUSTOMIZE_ME:
+      # The customer's upstream proxy username (an optional parameter, to be used IFF the customer has a dedicated upstream proxy)
+      upstreamProxyUsername: ''
+    confidential:
+      # CUSTOMIZE_ME:
+      # The customer's MSSQL data store (database) connection string (used to established a connection with the database)
+      defaultConnection: ''
+      # CUSTOMIZE_ME:
+      # The customer's LDAP server/service password (for establishing connection)
+      #   NOTE: Relevant IFF 'ManualOnboard' is selected for the 'global.configuration.externalIDPMode' parameter
+      ldapPassword: ''
+      # CUSTOMIZE_ME:
+      # The customer's SMTP mail server/service password (for establishing connection)
+      mailSmtpPassword: ''
+      # CUSTOMIZE_ME:
+      # The customer's upstream proxy password (for establishing connection), an optional parameter, to be used IFF the customer has a dedicated upstream proxy
+      upstreamProxyPassword: ''
+      #
+      # Below entries are not required for ASOP/AS360
+      #
+      opsConsoleDPKey : ''
+      oktaClientSecret: ''
+      oktaApiToken: ''
+      licenseApiKey: ''
+      githubClientSecret: ''
+common:
+  ingress:
+    enabled: false
+  service:
+    enabled: false
+  helmHooks:
+    rbacBaseName: helm-hooks-rbac
+
+ascp-user-portal-ui:
+  enabled: true
+
+ascp-domain-challenger:
+  enabled: true
+
+ascp-egress-gatekeeper:
+  enabled: true
+
+ascp-mr-tasks-manager:
+  enabled: true
+
+ascp-mr-user-api:
+  enabled: true
+
+ascp-mr-scanners-api:
+  enabled: true
+
+ascp-mr-presence-api:
+  enabled: true
