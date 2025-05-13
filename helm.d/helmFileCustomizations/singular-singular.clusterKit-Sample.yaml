@@ -72,24 +72,24 @@ global:
         name: appscan-root-ca-cert
         duration: 26280h0m0s # 3 years
         renewBefore: 8760h0m0s # 1 year
-  # ingress:
-  #   controller:
-  #     capabilities:
-  #       # CUSTOMIZE_ME:
-  #       # Indicates whether the Ingress Controller is based on NGINX, or the SSL onload (HTTPS backend protocol) is supported by the ingress controller (not via an annotation, but by the controller itself!), or not
-  #       isHttpsBackendProtocolSupported: true
-  #   internal:
-  #     # CUSTOMIZE_ME:
-  #     # The ingress class name to be used when deploying ingresses into the customer's K8S cluster
-  #     class: nginx
-  #     host:
-  #       # CUSTOMIZE_ME:
-  #       # The (main) domain to be used when deploying ingresses into the customer's K8S cluster (for building the host name)
-  #       #   NOTE: If left empty, it will be taken from the 'global.network.domainSuffix' field
-  #       domain: appscan.com
-  #       # CUSTOMIZE_ME:
-  #       # The sub domain to be used when deploying ingresses into the customer's K8S cluster (for building the host name)
-  #       subDomain: as360
+  ingress:
+    controller:
+      capabilities:
+        # CUSTOMIZE_ME:
+        # Indicates whether the Ingress Controller is based on NGINX, or the SSL onload (HTTPS backend protocol) is supported by the ingress controller (not via an annotation, but by the controller itself!), or not
+        isHttpsBackendProtocolSupported: true
+    internal:
+      # CUSTOMIZE_ME:
+      # The ingress class name to be used when deploying ingresses into the customer's K8S cluster
+      class: nginx
+      host:
+        # CUSTOMIZE_ME:
+        # The (main) domain to be used when deploying ingresses into the customer's K8S cluster (for building the host name)
+        #   NOTE: If left empty, it will be taken from the 'global.network.domainSuffix' field
+        domain: appscan.com
+        # CUSTOMIZE_ME:
+        # The sub domain to be used when deploying ingresses into the customer's K8S cluster (for building the host name)
+        subDomain: as360
   network:
     # CUSTOMIZE_ME:
     # The customer's designated (main) domain name

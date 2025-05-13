@@ -1,6 +1,6 @@
 global:
-  mainProductReleaseVersionNumber: 1.5.0-rc.50
-  mainProductReleaseVersionMarkup: 1.5.0-rc.50-release-asop
+  mainProductReleaseVersionNumber: 1.6.0-rc.27
+  mainProductReleaseVersionMarkup: 1.6.0-rc.27-release-asop
   isOnPremisesDeployment: true
   customer:
     certificate:
@@ -29,11 +29,11 @@ global:
     - name: pod-initializer
       imageUp2date: false
       imageName: ascp-dart-pod-initializer
-      imageTag: 1.2.0
+      imageTag: 1.3.0
     - name: dbmigrator-runner
       imageDirectUpdate: true
       imageName: ascp-mr-db-migrator-runner
-      imageTag: 2025-01-13-1939-11-release-asop
+      imageTag: 2025-04-14-0906-17-release-asop
   storage:
     pvc:
       linux:
@@ -126,11 +126,11 @@ ascp-mr-tasks-manager:
       - name: report-job
         imageDirectUpdate: true
         imageName: ascp-mr-report-processor
-        imageTag: 2025-01-13-1939-11-release-asop
+        imageTag: 2025-04-14-0906-17-release-asop
       - name: resultsprocessor-job
         imageDirectUpdate: true
         imageName: ascp-mr-tasks-manager
-        imageTag: 2025-01-13-1939-11-release-asop
+        imageTag: 2025-04-14-0906-17-release-asop
       - name: pss-presence-provisioner
         imageDirectUpdate: true
         imageName: ascp-pss-presence-provisioner
@@ -145,21 +145,21 @@ ascp-mr-tasks-manager:
         imageRepository: sast-k8s-docker-images
         imageIsAffiliated: true
         imageName: sastagent
-        imageTag: 8.0.1614
-      - name: sasttools
+        imageTag: 8.0.1631
+      - name: sast-tools-provisioner
         imageMarkerTag: as360
         imageVersionLabelName: version
         imageRepository: sast-k8s-docker-images
         imageIsAffiliated: true
         imageName: sastclient-tools
-        imageTag: 1.0.0_P74-CU.8.0.1604-GO.2.2.0
+        imageTag: 1.0.0_P83-CU.8.0.1631-GO.2.2.0
       - name: dast-job
         imageMarkerTag: as360
         imageVersionLabelName: version
         imageRepository: dast-k8s-docker-images
         imageIsAffiliated: true
         imageName: appscan-linux-dast-runner
-        imageTag: 1.4.0.266
+        imageTag: as360-1.6.0.606
       initContainers:
       - name: ascp-pss-presence-provisioner
         image: '{{ include "ascp-dart-common-helm-chart.sideCarImageURL" (dict "TopLevelScope" $ "SideCarsList" .Values.common.workload.sidecars "SideCarName" "pss-presence-provisioner") }}'
@@ -180,7 +180,7 @@ ascp-mr-tasks-manager:
         - name: shared-file-storage-volume
           mountPath: '{{ .Values.common.workload.sharedFileStorageMountPath }}'
       - name: sast-tools-provisioner
-        image: '{{ include "ascp-dart-common-helm-chart.sideCarImageURL" (dict "TopLevelScope" $ "SideCarsList" .Values.common.workload.sidecars "SideCarName" "sasttools") }}'
+        image: '{{ include "ascp-dart-common-helm-chart.sideCarImageURL" (dict "TopLevelScope" $ "SideCarsList" .Values.common.workload.sidecars "SideCarName" "sast-tools-provisioner") }}'
         imagePullPolicy: '{{ .Values.global.workload.container.image.pullPolicy }}'
         env:
         - name: SAST_TOOL_WIN_CLI_PATH
@@ -265,7 +265,6 @@ ascp-mr-scanners-api:
   common:
     workload:
       sharedFileStorageMountPathSuffix: ''
-      mainContainer: null
     certificate:
       ingress:
         internal:

@@ -23,6 +23,7 @@ environments:
     asraImageRegistry: {{ env "ASRA_IMAGE_REG" | default "hclcr.io" }}
     asraImageRepo: {{ env "ASRA_IMAGE_REPO" | default "appscan360/asra-k8s-docker-images" }}/asra
 
+
 ---
 
 repositories:
@@ -43,7 +44,7 @@ releases:
 - name: asra
   namespace: hcl-appscan-asra
   chart: {{ .Values.asraHelmRepo }}
-  version: 2.7.0-164GA
+  version: 2.8.0-168GA
   values:
   - image:
      registry: {{ .Values.asraImageRegistry }}

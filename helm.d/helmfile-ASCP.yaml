@@ -61,13 +61,18 @@ releases:
         containerSecurityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
+    # WA for a defect in the latest chart!
+    nameOverride: reloader
+    fullnameOverride: reloade
 - name: '{{ .Values.environment.releaseName }}'
   namespace: '{{ .Values.environment.releaseNamespace }}'
   chart: '{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/ascp-dart-prime'
-  version: 1.5.0-rc.50-release-asop
+  version: 1.6.0-rc.27-release-asop
   needs:
   - reloader
   values:
+#  - helmFileCustomizations/siteKit.yaml
+#  - helmFileCustomizations/{{ .Values.global.runtime.siteName }}.siteKit.yaml
   - helmFileCustomizations/clusterKit.yaml
   - helmFileCustomizations/{{ .Values.global.runtime.siteName }}-{{ .Values.global.runtime.clusterName }}.clusterKit.yaml
   - global:
@@ -93,7 +98,7 @@ releases:
             data:
 {{- if env "AS360_KNI_JSON_CONFIG_AS_BASE64" }}
               jsonConfigAsBase64: {{ env "AS360_KNI_JSON_CONFIG_AS_BASE64" }}
-{{- else }}  
+{{- else }}
               jsonConfigAsBase64: {{ readFile (printf "%s/%s" (env "HOME") ".docker/config.json") | b64enc }}
 {{- end }}
       storage:
