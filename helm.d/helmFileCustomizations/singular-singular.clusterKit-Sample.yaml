@@ -141,8 +141,7 @@ global:
       # Optional set of parameters, to be used IFF the customer has a dedicated upstream proxy (used to enable Internet access from within the customer's network),
       # holding the customer's upstream proxy settings (for establishing connection), if applicable.
       #   NOTES:
-      #     1.If used, the customer's upstream proxy needs to be configured to allow egress (outgoing) traffic to the following sites:
-      #       (-) hclsoftware.compliance.flexnetoperations.com
+      #     1. If used, the customer's upstream proxy needs to be configured to allow egress (outgoing) traffic
       #     2. Currently there is NO support using a script to configure the upstream proxy settings
       # The customer's upstream proxy host (an optional parameter, to be used IFF the customer has a dedicated upstream proxy)
       upstreamProxyHost: ''
