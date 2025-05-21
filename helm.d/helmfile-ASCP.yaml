@@ -31,38 +31,7 @@ environments:
         dockerRegistryAddress: hclcr.io
         dockerRegistryProject: appscan360
         dockerRegistryContext: appscan360/ascp-k8s-docker-images
-  # *** Non production/customer environments (to be removed in formal publication) - BEGIN ***
-  as360-stage:
-    values:
-    - global:
-        multiTenantDeploymentDifferentiator: ''
-        runtime:
-          siteName: singular
-          clusterName: singular
-    - environment:
-        helmRepositoryName: hclcr
-        helmRepositoryContext: appscan360-staging/ascp-k8s-helm-packages
-        releaseName: appscan360-ascp
-        releaseNamespace: hcl-appscan-ascp
-        dockerRegistryAddress: hclcr.io
-        dockerRegistryProject: appscan360-staging
-        dockerRegistryContext: appscan360-staging/ascp-k8s-docker-images
-  as360-dev:
-    values:
-    - global:
-        multiTenantDeploymentDifferentiator: kni-release-asop
-        runtime:
-          siteName: ldc
-          clusterName: expo
-    - environment:
-        helmRepositoryName: asocacr
-        helmRepositoryContext: ascp-k8s-helm-packages
-        releaseName: as360-ascp
-        releaseNamespace: hcl-appscan-ascp-kni-release-asop
-        dockerRegistryAddress: asocregistryea.azurecr.io
-        dockerRegistryProject: ''
-        dockerRegistryContext: ascp-k8s-docker-images
-  # *** Non production/customer environments (to be removed in formal publication)- END ***
+
 ---
 helmDefaults:
   cleanupOnFail: true
@@ -80,11 +49,6 @@ repositories:
 - name: hclcr
   url: hclcr.io
   oci: true
-# *** Non production/customer repositories (to be removed in formal publication) - BEGIN ***
-- name: asocacr
-  url: asocregistryea.azurecr.io
-  oci: true
-# *** Non production/customer repositories (to be removed in formal publication) - END ***
 
 releases:
 - name: reloader
