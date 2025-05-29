@@ -67,7 +67,7 @@ releases:
 - name: '{{ .Values.environment.releaseName }}'
   namespace: '{{ .Values.environment.releaseNamespace }}'
   chart: '{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/ascp-dart-prime'
-  version: 1.6.0-rc.27-release-asop
+  version: 1.6.0-rc.32-release-asop
   needs:
   - reloader
   values:

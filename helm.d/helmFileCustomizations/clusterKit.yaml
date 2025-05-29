@@ -1,6 +1,6 @@
 global:
-  mainProductReleaseVersionNumber: 1.6.0-rc.27
-  mainProductReleaseVersionMarkup: 1.6.0-rc.27-release-asop
+  mainProductReleaseVersionNumber: 1.6.0-rc.32
+  mainProductReleaseVersionMarkup: 1.6.0-rc.32-release-asop
   isOnPremisesDeployment: true
   customer:
     certificate:
@@ -33,7 +33,7 @@ global:
     - name: dbmigrator-runner
       imageDirectUpdate: true
       imageName: ascp-mr-db-migrator-runner
-      imageTag: 2025-04-14-0906-17-release-asop
+      imageTag: 2025-05-12-1006-21-release-asop
   storage:
     pvc:
       linux:
@@ -126,11 +126,11 @@ ascp-mr-tasks-manager:
       - name: report-job
         imageDirectUpdate: true
         imageName: ascp-mr-report-processor
-        imageTag: 2025-04-14-0906-17-release-asop
+        imageTag: 2025-05-12-1006-21-release-asop
       - name: resultsprocessor-job
         imageDirectUpdate: true
         imageName: ascp-mr-tasks-manager
-        imageTag: 2025-04-14-0906-17-release-asop
+        imageTag: 2025-05-12-1006-21-release-asop
       - name: pss-presence-provisioner
         imageDirectUpdate: true
         imageName: ascp-pss-presence-provisioner
