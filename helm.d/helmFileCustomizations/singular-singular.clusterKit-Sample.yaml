@@ -6,31 +6,38 @@
 # Settings that need to be customized by the customer are marked with 'CUSTOMIZE_ME' comments
 #
 global:
-  # customer:
-  #   certificate:
-  #     ingress:
-  #       # CUSTOMIZE_ME:
-  #       # Indication whether to use a customer given certificate as the applicable external (out-of-cluster) micro services ingresses certificates, or not
-  #       enabled: false
-  #       secret:
-  #         data:
-  #           # CUSTOMIZE_ME:
-  #           # The customer's supplied certificate authority (CA) signing certificate of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
-  #           caCrtAsBase64: ''
-  #           # CUSTOMIZE_ME:
-  #           # The customer's supplied public key of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
-  #           tlsCrtAsBase64: ''
-  #           # CUSTOMIZE_ME:
-  #           # The customer's supplied private key of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
-  #           tlsKeyAsBase64: ''
-  workload:
-    dockerPrivateRegistry:
-      secret:
-        enabled: true
-        name: ascp-docker-registry-secret
-        data:
-          # Auto generated Docker private registry user credentials configuration
-          jsonConfigAsBase64: ""
+  customer:
+    certificate:
+       ca:
+         # CUSTOMIZE_ME:
+         # Indication whether to use customer given CA certificates, or not
+         enabled: false
+         secret:
+           data:
+             # CUSTOMIZE_ME:
+             # The customer's supplied CA certificate used for signing LDAPs based service(s)
+             caCrtForLDAPsAsBase64: ''
+             # CUSTOMIZE_ME:
+             # The customer's supplied CA certificate used for signing SMTPs based service(s)
+             caCrtForSMTPsAsBase64: ''
+             # CUSTOMIZE_ME:
+             # The customer's supplied CA certificate used for signing OIDCs based service(s)
+             caCrtForOIDCsAsBase64: ''
+       ingress:
+         # CUSTOMIZE_ME:
+         # Indication whether to use a customer given certificate as the applicable external (out-of-cluster) micro services ingresses certificates, or not
+         enabled: false
+         secret:
+           data:
+             # CUSTOMIZE_ME:
+             # The customer's supplied certificate authority (CA) signing certificate of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
+             caCrtAsBase64: ''
+             # CUSTOMIZE_ME:
+             # The customer's supplied public key of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
+             tlsCrtAsBase64: ''
+             # CUSTOMIZE_ME:
+             # The customer's supplied private key of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
+             tlsKeyAsBase64: ''
   storage:
     pvc:
       linux:
@@ -55,6 +62,10 @@ global:
         # CUSTOMIZE_ME:
         # The customer's K8S shared storage designated size, to be calculated before installation, following the calculation logic outlined in the formal documentation
         requestedCapacity: 50Gi
+      accessMode: ReadWriteMany     # SCA
+      requestedCapacity: 10Gi       # SCA
+      storageClassName: longhorn      # SCA
+      volumeName: null              # SCA
   ca:
     seed:
       enabled: true
@@ -102,21 +113,37 @@ global:
       siteUrl: ''
       # CUSTOMIZE_ME:
       # The customer's LDAP server/service domain
+      # NOTES:
+      #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
+      #   2. Once set, it has precedence over the UI settings
+      #   3. This is a key setting, IFF set, it will override the UI related settings (alongside with all the other LDAP related settings below)
       ldapDomain: ''
       # CUSTOMIZE_ME:
       # The customer's LDAP server/service user name (for establishing connection)
-      #   NOTE: Relevant IFF 'ManualOnboard' is selected for the 'global.configuration.externalIDPMode' parameter
+      # NOTES:
+      #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
+      #   2. Once set, it has precedence over the UI settings
+      #   3. Relevant IFF 'ManualOnboard' is selected for the 'global.configuration.externalIDPMode' parameter
       ldapUsername: ''
       # CUSTOMIZE_ME:
       # The customer's list of LDAP groups (comma-separated) that are authorized to access the AppScan 360°
-      #   NOTE: Relevant IFF 'GroupsAccess' is selected for the 'global.configuration.externalIDPMode' parameter
+      # NOTES:
+      #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
+      #   2. Once set, it has precedence over the UI settings
+      #   3. Relevant IFF 'GroupsAccess' is selected for the 'global.configuration.externalIDPMode' parameter
       ldapAuthorizedGroups: ''
       # CUSTOMIZE_ME:
       # Indicates whether to establish a secured (over SSL/TLS) connection towards the customer's LDAP server/service, or not
-      #   NOTE: Valid values are 'True' or 'False'
+      # NOTES:
+      #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
+      #   2. Once set, it has precedence over the UI settings
+      #   3. Valid values are 'True' or 'False'
       ldapSsl: ''
       # CUSTOMIZE_ME:
       # The customer's designated location of the users in the its AD (Active Directory) for LDAP queries, it is used to authenticate AD users during login to AppScan 360°
+      # NOTES:
+      #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
+      #   2. Once set, it has precedence over the UI settings
       ldapTargetOU: ''
       # CUSTOMIZE_ME:
       # The customer's SMTP mail server/service host name
@@ -136,13 +163,14 @@ global:
       #   AutoOnboard: Any user with access to the server can log in to AppScan 360°.
       #   GroupsAccess: Any user in an authorized group (defined below) can log in to AppScan 360°.
       #   ManualOnboard: Users must be invited using the Add Users button on the Access management > Users page.
-      externalIDPMode: ''
+      externalIDPMode: 'AutoOnboard'
+      # CUSTOMIZE_ME:
+      # The customer's comma delimited external domains to allow access to, particularly crucial for establishing communication with OpenID Connect (OIDC) servers
+      externalDomains: ''
       # CUSTOMIZE_ME:
       # Optional set of parameters, to be used IFF the customer has a dedicated upstream proxy (used to enable Internet access from within the customer's network),
       # holding the customer's upstream proxy settings (for establishing connection), if applicable.
-      #   NOTES:
-      #     1. If used, the customer's upstream proxy needs to be configured to allow egress (outgoing) traffic
-      #     2. Currently there is NO support using a script to configure the upstream proxy settings
+      #   NOTE: Currently there is NO support using a script to configure the upstream proxy settings
       # The customer's upstream proxy host (an optional parameter, to be used IFF the customer has a dedicated upstream proxy)
       upstreamProxyHost: ''
       # CUSTOMIZE_ME:
@@ -151,13 +179,34 @@ global:
       # CUSTOMIZE_ME:
       # The customer's upstream proxy username (an optional parameter, to be used IFF the customer has a dedicated upstream proxy)
       upstreamProxyUsername: ''
+      # CUSTOMIZE_ME:
+      # The customer's designated K8S ASRA namespace to be used for AS360 installation
+      #   NOTE: This field is optional, If left empty, a factory default will be used
+      k8sAsraNamespace: 'hcl-appscan-asra'
+      # CUSTOMIZE_ME:
+      # The customer's OpenIdConnect (OIDC) client ID (used to establish a connection with the OIDC server)
+      # NOTES:
+      #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
+      #   2. Once set, it has precedence over the UI settings
+      #   3. IFF set, ALL other OIDC related parameters must be set as well in order to actually override the UI related settings
+      oidcClientId: ''
+      # CUSTOMIZE_ME:
+      # The customer's OIDC authority base URL to use when making OpenIdConnect (OIDC) calls
+      # NOTES:
+      #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
+      #   2. Once set, it has precedence over the UI settings
+      #   3. IFF set, ALL other OIDC related parameters must be set as well in order to actually override the UI related settings
+      oidcAuthority: ''
     confidential:
       # CUSTOMIZE_ME:
       # The customer's MSSQL data store (database) connection string (used to established a connection with the database)
       defaultConnection: ''
       # CUSTOMIZE_ME:
       # The customer's LDAP server/service password (for establishing connection)
-      #   NOTE: Relevant IFF 'ManualOnboard' is selected for the 'global.configuration.externalIDPMode' parameter
+      # NOTES:
+      #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
+      #   2. Once set, it has precedence over the UI settings
+      #   3. Relevant IFF 'ManualOnboard' is selected for the 'global.configuration.externalIDPMode' parameter
       ldapPassword: ''
       # CUSTOMIZE_ME:
       # The customer's SMTP mail server/service password (for establishing connection)
@@ -165,12 +214,17 @@ global:
       # CUSTOMIZE_ME:
       # The customer's upstream proxy password (for establishing connection), an optional parameter, to be used IFF the customer has a dedicated upstream proxy
       upstreamProxyPassword: ''
+      # CUSTOMIZE_ME:
+      # The customer's OpenIdConnect (OIDC) client secret (used to establish a connection with the OIDC server)
+      # NOTES:
+      #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
+      #   2. Once set, it has precedence over the UI settings
+      #   3. IFF set, ALL other OIDC related parameters must be set as well in order to actually override the UI related settings
+      oidcClientSecret: ''
       #
       # Below entries are not required for ASOP/AS360
       #
-      opsConsoleDPKey : ''
-      oktaClientSecret: ''
-      oktaApiToken: ''
+      opsConsoleDPKey: ''
       licenseApiKey: ''
       githubClientSecret: ''
 common:
@@ -201,3 +255,22 @@ ascp-mr-scanners-api:
 
 ascp-mr-presence-api:
   enabled: true
+
+ascp-mr-iast-api:
+  enabled: true
+
+scaenginefetchcve:
+  common:
+    # CUSTOMIZE_ME:
+    # The customer's MSSQL data store (database) connection string (used to established a connection with the database)
+    # If the connection string contains a comma, escape it with a backslash (\,)
+    scaservicesecrets:
+      ConnectionStrings__ScaAggregationDB: ''
+
+scaenginescanmonitorapi:
+  common:
+    scaservicesecrets:
+      # CUSTOMIZE_ME:
+      # The customer's MSSQL data store (database) connection string (used to established a connection with the database)
+      # If the connection string contains a comma, escape it with a backslash (\,).
+      ConnectionStrings__ScaEngineDatabase: ''

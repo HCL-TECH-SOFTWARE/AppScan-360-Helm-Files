@@ -17,11 +17,10 @@
 
   1. Download the Helmfile binary:
      ```bash
-     wget https://github.com/helmfile/helmfile/releases/download/v0.169.1/helmfile_0.169.1_linux_amd64.tar.gz
-     ```
+     wget -O helmfile.tar.gz $(curl -s https://api.github.com/repos/helmfile/helmfile/releases/latest | grep browser_download_url | grep linux_amd64.tar.gz | cut -d '"' -f 4)
   2. Extract the downloaded file:
      ```bash
-     tar -xvzf helmfile_0.169.1_linux_amd64.tar.gz
+     tar -xvzf helmfile_*_linux_amd64.tar.gz
      ```
   3. Move the helmfile binary to the appropriate directory:
      ```bash
@@ -58,37 +57,18 @@
 
 The repository for **AppScan-360-Helm-Files** is hosted on a GitHub server. To clone the repository, follow these steps:
 
-### Clone Command
-
-To clone the repository, use the following command:
-
-git clone --branch main https://Access-Token@github.com/HCL-TECH-SOFTWARE/AppScan-360-Helm-Files.git
-
-1. Access-Token: Replace this placeholder with your personal GitHub access token.
-
-### Generate Access-Token
-To generate a personal access token for cloning the repository, follow these steps:
-
-1. Navigate to Settings in GitHub.
-2. Go to Developer Settings.
-3. Under Developer Settings, select Personal Access Tokens.
-4. Click on Generate New Token.
-5. Follow the prompts to create your token with the necessary permissions (ensure that the token has permissions to access the repository).
-6. Use the generated token in the clone command where the Access-Token placeholder is specified.
-
 ### Repository Structure
 Once the repository is cloned, you will find the following directory structure.
 
 ```bash
 AppScan-360-Helm-Files
 ├── Helm.d
-├──  ├── helmfile-ASCP.yaml
-├──  ├── helmfile-ASRA.yaml
+├──  ├── helmfile-ASCP.yaml.gotmpl
+├──  ├── helmfile-ASRA.yaml.gotmpl
+│    ├── helmfile-SCA.yaml.gotmpl
 ├──  └── helmFileCustomization
-├──         ├── clusterKit.yaml
 ├──         ├── singular-singular.clusterKit-Sample.yaml
-├──         └── siteKit.yaml
-└── helmfile.yaml
+└── helmfile.yaml.gotmpl
 ```
       
 singular-singular.clusterKit-Sample.yaml: A file specific to the customer, requiring customization according to customer specifications which needs to be renamed to singular-singular.clusterKit.yaml.
@@ -118,6 +98,62 @@ For each upgrade, run git pull inside the cloned repository(AppScan-360-Helm-Fil
      helmfile destroy
     ```
 
+
+#### Optional: Include SCA Component
+Software Composition Analysis (SCA) is included when you install AppScan 360° with a parameter.
+##### Note: Software Composition Analysis (SCA) is not included in the AppScan 360° by default; you must enable it.
+
+To install AppScan360 along with SCA:
+
+```bash
+  includeSCA=true helmfile sync
+```
+To uninstall AppScan360 along with SCA:
+
+```bash
+  includeSCA=true helmfile destroy
+```
+
+To enable automatic updates of the Software Composition Analysis (SCA) vulnerability database, set the following environment variables that point to the HCL Harbor registry with the correct credentials.
+
+```bash
+export SCA_AUTOUPDATER_REGISTRY_USERNAME=<HCL_HARBOR_USERNAME>
+export SCA_AUTOUPDATER_REGISTRY_PASSWORD=<HCL_HARBOR_PASSWORD>
+```
+Important: If you do not set up automatic updates, you must update the vulnerability database manually.
+
+#### Version support using Git tags and archives
+AppScan 360° supports version-controlled installation using Git tags and archives.
+To clone the latest version of AppScan 360° using Git:
+
+```bash
+git clone 
+https://github.com/HCL-TECH-SOFTWARE/AppScan-360-Helm-Files.git
+```
+To clone a specific version of AppScan 360° using Git, where X.X.X is the specific version number:
+
+```bash
+git clone --branch vX.X.X 
+https://github.com/HCL-TECH-SOFTWARE/AppScan-360-Helm-Files.git
+```
+
+To download an archive directly, where X.X.X is the specific version number:
+
+```bash
+wget https://github.com/HCL-TECH-SOFTWARE/AppScan-360-Helm-Files/archive/refs/tags/vX.X.X.zip
+```
+
+To extract a specific archive, where X.X.X is the specific version number:
+
+```bash
+unzip AppScan-360-Helm-Files-vX.X.X.zip
+```
+or
+
+```bash
+tar -xvzf AppScan-360-Helm-Files-vX.X.X.tar.gz
+```
+
 #### Environment List:
  Points to Harbor’s production project, which may not have the final images yet. 
 
@@ -128,8 +164,9 @@ helm rollback <release-name> <revision-number> -n <namespace>
 ```
 
 Example release names:
-- appscan-secinfo (namespace: hcl-appscan-secinfo)
+- asra (namespace: hcl-appscan-asra)
 - appscan360-ascp (namespace: hcl-appscan-ascp)
+- scaservices (namespace: hcl-appscan-sca)
 
 You can find the available revision numbers using:
 ```bash 

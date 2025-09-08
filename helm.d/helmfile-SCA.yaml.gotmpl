@@ -1,0 +1,181 @@
+#
+# Prerequisites:
+#   (*) Ensure you are running from a folder that contains the helmfile.d folder
+#
+# Usage:
+#   (*) Install: helmfile sync
+#     Ensure the following:
+#       1. Define an environment variable as follows:
+#         Name: AS360_KNI_JSON_CONFIG_AS_BASE64
+#         Value: The designated registry docker config file, encoded in Base64
+#         Name: SCA_AUTOUPDATER_REGISTRY_ADDRESS
+#         Value: The address of the registry to be used by the SCA AutoUpdater. 
+#         This variable is OPTIONAL and  only needed needed only if you want the auto-updater feature to be enabled.
+#         Name: SCA_AUTOUPDATER_REGISTRY_USERNAME
+#         Value: The username of the registry to be used by the SCA AutoUpdater.
+#         This variable is OPTIONAL and needed only if you want the auto-updater feature to be enabled.
+#         Name: SCA_AUTOUPDATER_REGISTRY_PASSWORD
+#         Value: The password of the registry to be used by the SCA AutoUpdater.
+#         This variable is OPTIONAL and needed only if you want the auto-updater feature to be enabled.
+#       2. Values for the below variables are a pre-requisite and needs to be populated in helmfile.d/scaKit.yaml:
+#         Name: requestedCapacity
+#         Value: The customer's K8S shared storage designated size, to be calculated before installation
+#         Name: storageClassName
+#         Value: The customer's K8S shared storage designated file path
+#         Name: ConnectionStrings__ScaEngineDatabase
+#         Value: The connection string for the SCA Engine database
+#         Name: ConnectionStrings__ScaAggregationDB
+#         Value: The connection string for the SCA Aggregate database
+#
+#   (*) Uninstall: helmfile destroy
+#
+environments:
+  default:
+    values:
+    - global:
+        multiTenantDeploymentDifferentiator: ''
+        runtime:
+          siteName: singular
+          clusterName: singular
+    - environment:
+        helmRepositoryName: hclcr
+        helmRepositoryContext: appscan360-staging/as360-k8s-helm-packages
+        releaseName: appscan360-sca
+        releaseNamespace: hcl-appscan-sca
+        ascpNamespace: hcl-appscan-ascp
+        dockerRegistryAddress: hclcr.io
+        dockerRegistryContext: "appscan360-staging/as360-k8s-docker-images"
+---
+helmDefaults:
+  cleanupOnFail: true
+  wait: true
+  waitForJobs: true
+  atomic: true
+  timeout: 600
+  createNamespace: true
+  #deleteWait: true
+
+repositories:
+- name: hclcr
+  url: hclcr.io
+  oci: true
+
+releases:
+- name: 'scaservices'
+  namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
+  chart: '{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/scadeployment'
+  version: '1.0.172-rc-2025-08-07-1605-50'
+  values:
+  - helmFileCustomizations/{{ .Values.global.runtime.siteName }}-{{ .Values.global.runtime.clusterName }}.clusterKit.yaml
+  - global:
+      workload:
+        container:
+          image:
+            registry: {{ .Values.environment.dockerRegistryAddress }}
+            repository: {{ .Values.environment.dockerRegistryContext }}
+            pullSecrets:
+            - sca-docker-registry-secret
+        dockerPrivateRegistry:
+          secret:
+            data:
+{{- if env "AS360_KNI_JSON_CONFIG_AS_BASE64" }}
+              jsonConfigAsBase64: {{ env "AS360_KNI_JSON_CONFIG_AS_BASE64" }}
+              jsonConfigAsBase64Harbor: {{ env "AS360_KNI_JSON_CONFIG_AS_BASE64" }}
+{{- else }}
+              jsonConfigAsBase64: {{ readFile (printf "%s/%s" (env "HOME") ".docker/config.json") | b64enc }}
+              jsonConfigAsBase64Harbor: {{ readFile (printf "%s/%s" (env "HOME") ".docker/config.json") | b64enc }}
+{{- end }}
+  - rabbitmq:
+      image:
+        repository: "{{ .Values.environment.dockerRegistryContext }}/bitnami/rabbitmq"
+        registry: '{{ .Values.environment.dockerRegistryAddress }}'
+        pullSecrets:
+          - sca-docker-registry-secret
+      volumePermissions:
+        image:
+          pullSecrets:
+            - sca-docker-registry-secret
+
+  - scadpr:
+      common:
+        dockerPrivateRegistry:
+          secret:
+            enabled: false
+            helmenabled: true
+  - argo-cd:
+      global:
+        image:
+          repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoproj/argocd'
+        imagePullSecrets:
+        - name: sca-docker-registry-secret
+      dex:
+        image:
+          repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/ghcr.io/dexidp/dex'
+        imagePullSecrets:
+        - name: sca-docker-registry-secret
+      redis:
+        image:
+          repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/public.ecr.aws/docker/library/redis'
+        imagePullSecrets:
+        - name: sca-docker-registry-secret
+        exporter:
+          image:
+            repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/ghcr.io/oliver006/redis_exporter'
+          imagePullSecrets:
+          - name: sca-docker-registry-secret
+      redis-ha:
+        image:
+          repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/public.ecr.aws/docker/library/redis'
+        imagePullSecrets:
+        - name: sca-docker-registry-secret
+      redisSecretInit:
+        imagePullSecrets:
+        - name: sca-docker-registry-secret
+      controller:
+        imagePullSecrets:
+        - name: sca-docker-registry-secret
+  - argocd-image-updater:
+      image:
+        repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoprojlabs/argocd-image-updater'
+      imagePullSecrets:
+      - name: sca-docker-registry-secret
+  - scaengineasocintegratorapi:
+      common:
+        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+  - scaenginescanapi:
+      common:
+        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+  - scaargorepository:
+      common:
+        scaservicesecrets:
+          username: {{ env "SCA_AUTOUPDATER_REGISTRY_USERNAME" | default "" }}
+          password: {{ env "SCA_AUTOUPDATER_REGISTRY_PASSWORD" | default "" }}
+          url: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default "" }}
+  - scadprautoupdater:
+      common:
+        dockerPrivateRegistry:
+          secret:
+            enabled: true
+            helmenabled: false
+            server: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
+            username: '{{ env "SCA_AUTOUPDATER_REGISTRY_USERNAME" | default "" }}'
+            password: '{{ env "SCA_AUTOUPDATER_REGISTRY_PASSWORD" | default "" }}'
+            email: ""
+
+  - scaargocveupdater:
+      common:
+        AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
+        AutoUpdaterRegistryPath: '{{ .Values.environment.dockerRegistryContext }}'
+        RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
+        namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
+        AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
+
+  - scaargolibraryupdater:
+      common:
+        AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
+        AutoUpdaterRegistryPath: '{{ .Values.environment.dockerRegistryContext }}'
+        AutoUpdaterRegistrySecretName: sca-docker-registry-secret
+        RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
+        namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
+        AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
+

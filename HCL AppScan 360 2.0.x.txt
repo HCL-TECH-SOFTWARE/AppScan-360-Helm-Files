@@ -1,0 +1,51 @@
+﻿LICENSE INFORMATION DOCUMENT	
+ 
+Program Name: 	
+HCL AppScan 360 2.0.x
+
+The following terms apply to the use of the Program:
+
+Definitions:
+Licensee. For the purposes of this License Information Document, Licensee shall also mean Customer, an End User or other holder of an entitlement to which the License Information Document relates.
+
+Limited use right 	
+As described in the HCL Master License Agreement available at: https://www.hcl-software.com/resources/master-agreements or the applicable agreement between HCL and Licensee ("MLA") and this License Information Document, HCL grants Licensee a limited right to use the Program. This right is limited to the level of Authorized Use defined in License Metric below or other specified level of use, paid for by Licensee and evidenced by the proof of entitlement. Licensee's use may also be subject to other restrictions as prescribed in this License Information Document.
+
+Trial Period
+For the purposes of HCL AppScan 360 2.0.x(Evaluation), section 3.4 of the MLA shall apply and the trial period of use shall not exceed thirty (30) days unless authorized expressly by HCLSoftware in writing. 
+
+Software Development Kit   	
+If the Program includes a Software Development Kit ("SDK"), the terms and conditions of this paragraph apply solely for the use of the SDK.  The SDK may include software, APIs and associated documentation.  The SDK is provided solely for Licensee's internal use to develop software that enables the integration of third-party software or hardware with the Program, or to develop software that functions with the Program, such as an agent.  Licensee’s use of the SDK is restricted solely to enhance Licensee’s internal use of the Program.  No distribution rights of any kind are granted to Licensee regarding the Program.  In addition to the limitations on use set forth in the MLA and License Information Document, Licensee may not reproduce, disclose, market, or distribute the SDK or the documentation or any applications containing any executable versions of the SDK to third parties, on the internet, or use such executables in excess of the applicable authorized use limitation.  If there is a conflict between the terms of this section and the terms of any other section in MLA and License Information Document, the terms of this section will prevail solely with respect to the use of the SDK. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, AND NOTWITHSTANDING ANYTHING CONTAINED HEREIN TO THE CONTRARY, THE SDK IS PROVIDED AND LICENSED "AS IS" WITHOUT ANY WARRANTY OR REPRESENTATION OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR REPRESENTATIONS OF TITLE, NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR PURPOSE, AS WELL AS ANY EXPRESS WARRANTIES PROVIDED ELSEWHERE IN THIS AGREEMENT. HCL will not be liable for any costs or damages and will not indemnify or defend Licensee to the extent such action is based upon a claim arising from SDK.
+
+Redistributables 	
+The Program includes the re-distributable components listed in the table below ("Redistributable Code"). Licensee is authorized to install and use the Redistributable Code for its internal business purposes in accordance with the applicable license terms and conditions listed in the table below (“Redistributable License Conditions”). The Redistributable Code may not be used for any other purpose. Notwithstanding the foregoing, to the extent the MLA and the Redistributable License Conditions permits the Licensee to re-distribute the Redistributable Code as part of Licensee’s application, Licensee may re-distribute the Redistributable Code in accordance with the Redistributable License Conditions, but only to support Licensee's customers in connection with their use of Licensee's application. When Licensee's right to use the Program expires or terminates and unless otherwise agreed to by the Parties in the MLA, Licensee must discontinue use, destroy or promptly return all copies of the Redistributable Code to HCL.
+
+Source Components and Sample Materials  
+The Program may include some components in source code form ("Source Components") and other materials identified as "Sample Materials" Licensee may copy and modify Source Components and Sample Materials for internal use only provided such use is within the limits of the license rights under this License Information document and Agreement, provided however that Licensee may not alter or delete any copyright information or notices contained in the Source Components or Sample Materials. HCL provides the Source Components and Sample Materials without obligation of support and "AS IS", WITH NO WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING THE WARRANTY OF TITLE, NON-INFRINGEMENT OR NON-INTERFERENCE AND THE IMPLIED WARRANTIES AND CONDITIONS OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. 
+ 
+Privacy 
+Licensee acknowledges and agrees that HCL may use third party software, cookie and tracking technologies to collect, maintain, process and use analytics data and personal information in gathering product usage statistics and information designed to help improve user experience and/or to tailor	 interactions with users in accordance with the HCL Privacy Statement, available at:	 https://www.hcltech.com/privacy-statement. 
+
+AI APIs: Use of Customer Data 
+Customer agrees that, to the extent that information received constitutes personally identifiable information, such information shall be processed in accordance with HCLSoftware’s Data Processing Addendum and Privacy Statement as relevant. 
+
+Third Party Data and Services
+The Program may contain links to or be used to access third party data services, databases, web services, software, or other third party content (all, "content"). Access to this content is provided "AS-IS", WITH NO WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING THE WARRANTY OF TITLE, NON-INFRINGEMENT OR NON-INTERFERENCE AND THE IMPLIED WARRANTIES AND CONDITIONS OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. Access can be terminated by the relevant third parties at their sole discretion at any time. In the event that Third Party Software is included in the Program(s), such Third Party Software is made available to Licensee in accordance with the licenses for such Third Party Software. Licensee may be required to enter into separate agreements with the third parties for the access to or use of such content. HCL is not a party to any such separate agreements and as an express condition of this license Licensee agrees to comply with the terms of such separate agreements.[     
+
+Program-unique Terms
+The Program is designed to identify a variety of potential security and compliance issues in web applications and web services. It does not test all vulnerabilities or compliance risks, nor does it act as a barrier to security attacks. HCLSoftware does not represent or warrant that the Program will provide complete security vulnerability or compliance information or that Licensee's web application or web services are secure or compliant. Security threats, regulations and standards continually change, and the Program may not reflect all such changes. The security and compliance of Licensee's website, systems and employees, and any remedial actions, are Licensee's responsibility alone. It is solely within Licensee's discretion to use or not use any of the information provided by the Program. Accordingly, HCSoftware will not be liable for any actions that Licensee takes or chooses not to take based on the Program. 
+
+Third Party Software
+Licensee may choose to install AppScan 360 2.0.x that adheres to Federal Information Processing Standards (FIPS), which requires Licensee to independently acquire the necessary quantity of Ubuntu Pro licenses to support Licensee's environment in accordance with the applicable licensing terms and conditions.  
+
+Metrics
+The following units of measure may apply to Licensee's use of the Program:
+
+“Contributing User” means an Authorized User and any other user who accesses or uses the AppScan application or that writes, develops or modifies the Licensee’s, or Affiliate’s code being scanned or monitored by the AppScan application.  For the avoidance of doubt, the Contributing User will not be counted more than once even if acting in multiple roles such as a developer and platform user. All Contributing Users require an entitlement regardless of their direct access to the AppScan platform. Contributing Users do not include individuals within the Licensee’s organization who perform only software related documentation or project management tasks.
+“Application” means one (1) ”Project” or ten (10) “Microservices”. 
+“Project” means a single codebase which is maintained over time and used to build a particular named software module or application.
+“Microservice” means a single codebase up to twenty thousand (20,000) lines of code that is independently deployable with well-defined interfaces and operations, which is part of a suite of modular components or services and supports a specific task or a business goal
+“Concurrent Scan” means the number of simultaneous scans that may be executed by the Program.   Limited to one (1) simultaneously running scan for each one (1) entitlement.
+     
+
+

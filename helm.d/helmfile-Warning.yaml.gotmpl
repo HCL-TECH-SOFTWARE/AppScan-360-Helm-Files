@@ -1,0 +1,39 @@
+﻿hooks:
+  - events: ["prepare"]
+    showlogs: true
+    command: "sh"
+    args:
+      - -c
+      - |
+        echo "###############################################################################"
+        echo "# ⚠️  WARNING: Mandatory Pre-Upgrade Step for AppScan 360 v2.0.0"
+        echo "# Applicable only for upgrades from v1.6.x or earlier. This step can be skipped for fresh installations."
+        echo "#"
+        echo "# As part of security best practices, you must update the ownership of the"
+        echo "# storage volume before upgrading to v2.0.0."
+        echo "#"
+        echo "# Steps to follow:"
+        echo "#"
+        echo "# 1. Identify the userapi pod name:"
+        echo "#    kubectl -n hcl-appscan-ascp get pods"
+        echo "#    (Example pod name: ascp-mr-user-api-7f7bd44c78-c9d7n)"
+        echo "#"
+        echo "# 2. Run the following command (replace <userapi pod> with actual pod name):"
+        echo "#    kubectl -n hcl-appscan-ascp exec <userapi pod> -- chown -R 1111:2222 /storagemount"
+        echo "#"
+        echo "# 3. Verify the ownership change:"
+        echo "#    kubectl -n hcl-appscan-ascp exec <userapi pod> -- ls -la /storagemount"
+        echo "#"
+        echo "# ⚠️ IMPORTANT:"
+        echo "# - This command must be executed BEFORE upgrading to v2.0.0"
+        echo "# - Do NOT run scans, reports, or other operations AFTER executing this command"
+        echo "#   and BEFORE upgrading"
+        echo "# - The process may take a few minutes depending on the number of scans"
+        echo "# - Please check AppScan 360 Whats New Section for more details on this"
+        echo "#"
+        echo "#############################################################################"
+
+releases:
+  - name: noop
+    chart: "chartmuseum/empty" # or any tiny no-op chart
+    installed: false           # prevents install, keeps Helmfile quiet
