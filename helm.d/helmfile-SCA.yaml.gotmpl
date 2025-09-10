@@ -39,12 +39,12 @@ environments:
           clusterName: singular
     - environment:
         helmRepositoryName: hclcr
-        helmRepositoryContext: appscan360-staging/as360-k8s-helm-packages
+        helmRepositoryContext: appscan360/as360-k8s-helm-packages
         releaseName: appscan360-sca
         releaseNamespace: hcl-appscan-sca
         ascpNamespace: hcl-appscan-ascp
         dockerRegistryAddress: hclcr.io
-        dockerRegistryContext: "appscan360-staging/as360-k8s-docker-images"
+        dockerRegistryContext: "appscan360/as360-k8s-docker-images"
 ---
 helmDefaults:
   cleanupOnFail: true
