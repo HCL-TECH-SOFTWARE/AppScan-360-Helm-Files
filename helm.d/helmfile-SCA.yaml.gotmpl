@@ -45,6 +45,7 @@ environments:
         ascpNamespace: hcl-appscan-ascp
         dockerRegistryAddress: hclcr.io
         dockerRegistryContext: "appscan360/as360-k8s-docker-images"
+        autoupdaterImageTag: "newest-build-2.0.1"
 ---
 helmDefaults:
   cleanupOnFail: true
@@ -64,7 +65,7 @@ releases:
 - name: 'scaservices'
   namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
   chart: '{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/scadeployment'
-  version: '1.0.172-rc-2025-08-07-1605-50'
+  version: '2.0.1-rc.20251128103429613'
   values:
   - helmFileCustomizations/{{ .Values.global.runtime.siteName }}-{{ .Values.global.runtime.clusterName }}.clusterKit.yaml
   - global:
@@ -145,6 +146,7 @@ releases:
   - scaenginescanapi:
       common:
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+
   - scaargorepository:
       common:
         scaservicesecrets:
@@ -169,6 +171,7 @@ releases:
         RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
         namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
         AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
+        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build" }}" 
 
   - scaargolibraryupdater:
       common:
@@ -178,4 +181,5 @@ releases:
         RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
         namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
         AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
+        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build"}}" 
 

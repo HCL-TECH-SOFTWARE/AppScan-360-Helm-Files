@@ -54,7 +54,7 @@ releases:
 - name: '{{ .Values.environment.releaseName }}'
   namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
   chart: '{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/ascp-dart-prime'
-  version: 2.0.0-rc.50-release-asop
+  version: 2.0.1-rc.20-release-asop-2.0.0
   values:
   - helmFileCustomizations/{{ .Values.global.runtime.siteName }}-{{ .Values.global.runtime.clusterName }}.clusterKit.yaml
   - global:
