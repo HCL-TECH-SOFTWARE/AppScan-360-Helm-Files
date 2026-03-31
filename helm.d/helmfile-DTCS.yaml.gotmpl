@@ -1,0 +1,94 @@
+#
+# Prerequisites:
+#   (*) Clone the designated AS360 KNI git repository
+#   (*) Ensure you are logged in the designated docker registry (docker login),
+#       OR define env var AS360_KNI_JSON_CONFIG_AS_BASE64 with base64-encoded config.json.
+#   (*) Otherwise ~/.docker/config.json will be used automatically.
+# Usage:
+#   (*) Install: helmfile sync
+#     Ensure one of the following:
+#       1. Define an environment variable as follows:
+#         Name: AS360_KNI_JSON_CONFIG_AS_BASE64 
+#         Value: The designated registry docker config file, encoded in Base64
+#       2. Verify an already configured docker config file is residing under the home folder of the user (e.g., ~/.docker/config.json)
+#   (*) Uninstall: helmfile destroy
+#
+
+environments:
+  default:
+    values:
+      - helmFileCustomizations/singular-singular.clusterKit.yaml
+      - global:
+          runtime:
+            siteName: singular
+            clusterName: singular
+      - dastHelmRepositoryName: hclcr
+        dastHelmRegistry: hclcr.io
+        dastHelmRepo: appscan360/as360-k8s-helm-packages
+        dastImageRegistry: hclcr.io
+        dastImageRepo: appscan360/as360-k8s-docker-images
+        nameSpace: hcl-appscan-dast
+ 
+---
+
+repositories:
+  - name: hclcr
+    url: hclcr.io
+    oci: true
+
+helmDefaults:
+  atomic: true
+  cleanupOnFail: false
+  createNamespace: true
+  deleteWait: true
+  timeout: 600
+  wait: true
+  waitForJobs: true
+
+---
+
+{{- $helmRepoRegistry := default "" -}}
+{{- $helmRepoContext := default "" -}}
+
+{{- if hasKey .Values.global "helm" }}
+  {{- $helmRepoRegistry = .Values.global.helm.package.registry | default $helmRepoRegistry -}}
+  {{- $helmRepoContext = .Values.global.helm.package.context | default $helmRepoContext -}}
+{{- end }}
+
+releases:
+  - name: dast-template-service
+    namespace: '{{ .Namespace | default .Values.nameSpace }}'
+
+{{- if not (empty $helmRepoRegistry) }}
+    chart: oci://{{ $helmRepoRegistry }}/{{ $helmRepoContext }}/dast-template-service
+{{- else }}
+    chart: '{{ .Values.dastHelmRepositoryName }}/{{ .Values.dastHelmRepo }}/dast-template-service'
+{{- end }}
+    version: '1.0.0-8-a360'
+
+    values:
+      - helmFileCustomizations/{{ .Values.global.runtime.siteName }}-{{ .Values.global.runtime.clusterName }}.clusterKit.yaml
+      - global:
+          workload: 
+            container:
+{{- if not (empty $helmRepoRegistry) }}
+              image:
+                registry: {{ .Values.global.workload.container.image.registry }}
+                repository: {{ .Values.global.workload.container.image.repository }}/dast-template-service
+{{- else }}
+              image:
+                registry: {{ .Values.dastImageRegistry }}
+                repository: {{ .Values.dastImageRepo }}/dast-template-service
+{{- end }}
+                dockerPrivateRegistry:
+                  secret:
+                    data:
+                      jsonConfigAsBase64: |
+                        {{- /* Resolve docker config inline (env first, else ~/.docker/config.json) */ -}}
+                        {{- $cfg := env "AS360_KNI_JSON_CONFIG_AS_BASE64" -}}
+                        {{- if not $cfg }}
+                          {{- $home := env "HOME" -}}
+                          {{- $path := printf "%s/.docker/config.json" $home -}}
+                          {{- $cfg = readFile $path | b64enc -}}
+                        {{- end }}
+                        {{ $cfg }}

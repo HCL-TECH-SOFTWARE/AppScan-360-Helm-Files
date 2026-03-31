@@ -16,11 +16,18 @@
 #   (*) Uninstall: helmfile destroy
 #   includeSCA=true helmfile sync for including sca for installation
 #   includeSCA=true helmfile destroy for including sca for destory
+#   excludeDAST=true helmfile sync for excluding dtcs for installation
+#   excludeDAST=true helmfile destroy for excluding dtcs for destory
 #
+
 helmfiles:
   - path: ./helm.d/helmfile-Warning.yaml.gotmpl
   - path: ./helm.d/helmfile-ASCP.yaml.gotmpl
   - path: ./helm.d/helmfile-ASRA.yaml.gotmpl
+{{- if ne (env "excludeDTCS") "true" }}
+  - path: ./helm.d/helmfile-DTCS.yaml.gotmpl
+{{- end }}
+
 {{- if eq (env "includeSCA") "true" }}
   - path: ./helm.d/helmfile-SCA.yaml.gotmpl
 {{- end }}
