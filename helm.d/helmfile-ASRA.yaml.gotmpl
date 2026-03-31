@@ -12,16 +12,20 @@
 #         Value: The designated registry docker config file, encoded in Base64
 #       2. Verify an already configured docker config file is residing under the home folder of the user (e.g., ~/.docker/config.json)
 #   (*) Uninstall: helmfile destroy
-# 
+#
 
 
 environments:
- default:
-  values:
-  - asraHelmRegistry: {{ env "ASRA_HELM_REG" | default "hclcr.io" }}
-    asraHelmRepo: hcl_asra/{{ env "ASRA_HELM_REPO" | default "appscan360/as360-k8s-helm-packages" }}/asra
-    asraImageRegistry: {{ env "ASRA_IMAGE_REG" | default "hclcr.io" }}
-    asraImageRepo: {{ env "ASRA_IMAGE_REPO" | default "appscan360/as360-k8s-docker-images" }}/asra-img
+  default:
+    values:
+    - global:
+        version: 2.10.1-178GA
+    - helmFileCustomizations/singular-singular.clusterKit.yaml
+    - asraHelmRegistry: {{ env "ASRA_HELM_REG" | default "hclcr.io" }}
+      asraHelmRepo: hcl_asra/{{ env "ASRA_HELM_REPO" | default "appscan360/as360-k8s-helm-packages" }}/asra
+      asraImageRegistry: {{ env "ASRA_IMAGE_REG" | default "hclcr.io" }}
+      asraImageRepo: {{ env "ASRA_IMAGE_REPO" | default "appscan360/as360-k8s-docker-images" }}/asra-img
+
 
 ---
 
@@ -31,23 +35,40 @@ repositories:
   oci: true
 
 helmDefaults:
- atomic: true
- cleanupOnFail: false
- createNamespace: true
- deleteWait: true
- timeout: 600
- wait: true
- waitForJobs: true
+  atomic: true
+  cleanupOnFail: false
+  createNamespace: true
+  deleteWait: true
+  timeout: 600
+  wait: true
+  waitForJobs: true
+ 
+{{- $helmRepoRegistry := default "" -}}
+{{- $helmRepoContext := default "" -}}
+
+{{- if hasKey .Values.global "helm" }}
+  {{- $helmRepoRegistry = .Values.global.helm.package.registry | default $helmRepoRegistry -}}
+  {{- $helmRepoContext = .Values.global.helm.package.context | default $helmRepoContext -}}
+{{- end }}
 
 releases:
 - name: asra
   namespace: hcl-appscan-asra
+{{- if not (empty $helmRepoRegistry) }}
+  chart: oci://{{ $helmRepoRegistry }}/{{ $helmRepoContext }}/asra
+{{- else }}
   chart: {{ .Values.asraHelmRepo }}
-  version: 2.9.0-170GA
+{{- end }}
+  version: {{ .Values.global.version }}
   values:
   - image:
+{{- if not (empty $helmRepoRegistry) }}
+     registry: {{ .Values.global.workload.container.image.registry }}
+     repository: {{ .Values.global.workload.container.image.repository }}/asra-img
+{{- else }}
      registry: {{ .Values.asraImageRegistry }}
      repository: {{ .Values.asraImageRepo }}
+{{- end }}
      asraImagePullSecret:
 {{- if env "AS360_KNI_JSON_CONFIG_AS_BASE64" }}
               {{ env "AS360_KNI_JSON_CONFIG_AS_BASE64" }}

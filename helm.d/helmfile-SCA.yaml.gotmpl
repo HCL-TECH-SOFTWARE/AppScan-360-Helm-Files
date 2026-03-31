@@ -32,6 +32,7 @@
 environments:
   default:
     values:
+    - helmFileCustomizations/singular-singular.clusterKit.yaml
     - global:
         multiTenantDeploymentDifferentiator: ''
         runtime:
@@ -45,14 +46,15 @@ environments:
         ascpNamespace: hcl-appscan-ascp
         dockerRegistryAddress: hclcr.io
         dockerRegistryContext: "appscan360/as360-k8s-docker-images"
-        autoupdaterImageTag: "newest-build-2.0.1"
+        autoupdaterImageTag: "newest-build-2.1.0"
+        autoscaling: "false"
 ---
 helmDefaults:
   cleanupOnFail: true
   wait: true
   waitForJobs: true
   atomic: true
-  timeout: 600
+  timeout: 1200
   createNamespace: true
   #deleteWait: true
 
@@ -60,20 +62,69 @@ repositories:
 - name: hclcr
   url: hclcr.io
   oci: true
+# *** Non production/customer repositories (to be removed in formal publication) - BEGIN ***
+- name: scaacr
+  url: crsca180globalprodeus.azurecr.io
+  oci: true
+---
+
+{{- $helmRepoRegistry := default "" -}}
+{{- $helmRepoContext := default "" -}}
+
+{{- if hasKey .Values.global "helm" }}
+  {{- $helmRepoRegistry = .Values.global.helm.package.registry | default $helmRepoRegistry -}}
+  {{- $helmRepoContext = .Values.global.helm.package.context | default $helmRepoContext -}}
+{{- end }}
 
 releases:
 - name: 'scaservices'
   namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
-  chart: '{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/scadeployment'
-  version: '2.0.1-rc.20251128103429613'
+  hooks:
+    - events: ["preuninstall"]
+      command: "sh"
+      args:
+        - "-c"
+        - |
+          echo "Patching CRDs to remove finalizers and performing cleanup tasks before uninstall..."
+          # Delete multiple CRDs
+          kubectl patch crd scaledobjects.keda.sh -n '{{ .Namespace | default .Values.environment.releaseNamespace }}' -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+
+          # Patch a resource before removal (example: remove finalizers)
+          kubectl delete scaledobject --all -n '{{ .Namespace | default .Values.environment.releaseNamespace }}' || true
+
+    - events: ["postuninstall"]
+      command: "sh"
+      args:
+        - "-c"
+        - |
+          echo "Patching CRDs to remove finalizers and performing cleanup namespace tasks..."
+          kubectl patch crd triggerauthentications.keda.sh -n '{{ .Namespace | default .Values.environment.releaseNamespace }}' -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+          kubectl patch crd imageupdaters.argocd-image-updater.argoproj.io -n '{{ .Namespace | default .Values.environment.releaseNamespace }}' -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+          # Run any other cleanup commands
+          kubectl delete namespace '{{ .Namespace | default .Values.environment.releaseNamespace }}' --ignore-not-found=true
+
+{{- if not (empty $helmRepoRegistry) }}
+  chart: oci://{{ $helmRepoRegistry }}/{{ $helmRepoContext }}/scadeployment
+{{- else }}
+  chart: "{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/scadeployment"
+{{- end }}
+
+
+  version: '2.1.0-20260305150443305-fed-release-ubuntu-2204'
   values:
   - helmFileCustomizations/{{ .Values.global.runtime.siteName }}-{{ .Values.global.runtime.clusterName }}.clusterKit.yaml
   - global:
       workload:
         container:
           image:
+{{- if not (empty $helmRepoRegistry) }}
+            registry: {{ .Values.global.workload.container.image.registry }}
+            repository: {{ .Values.global.workload.container.image.repository }}
+{{- else }}
             registry: {{ .Values.environment.dockerRegistryAddress }}
             repository: {{ .Values.environment.dockerRegistryContext }}
+{{- end }}
+
             pullSecrets:
             - sca-docker-registry-secret
         dockerPrivateRegistry:
@@ -88,8 +139,15 @@ releases:
 {{- end }}
   - rabbitmq:
       image:
-        repository: "{{ .Values.environment.dockerRegistryContext }}/bitnami/rabbitmq"
-        registry: '{{ .Values.environment.dockerRegistryAddress }}'
+{{- if not (empty $helmRepoRegistry) }}
+        registry: {{ .Values.global.workload.container.image.registry }}
+        repository: {{ .Values.global.workload.container.image.repository }}/bitnami/rabbitmq
+{{- else }}
+        registry: {{ .Values.environment.dockerRegistryAddress }}
+        repository: {{ .Values.environment.dockerRegistryContext }}/bitnami/rabbitmq
+{{- end }}
+        tag: 4.2.2-debian-12-r1-p180
+
         pullSecrets:
           - sca-docker-registry-secret
       volumePermissions:
@@ -106,27 +164,56 @@ releases:
   - argo-cd:
       global:
         image:
-          repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoproj/argocd'
+{{- if not (empty $helmRepoRegistry) }}
+          repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/quay.io/argoproj/argocd
+{{- else }}
+          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoproj/argocd
+{{- end }}
+          tag: "v3.2.3-p180-2"
+
         imagePullSecrets:
         - name: sca-docker-registry-secret
       dex:
         image:
-          repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/ghcr.io/dexidp/dex'
+{{- if not (empty $helmRepoRegistry) }}
+          repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/ghcr.io/dexidp/dex
+{{- else }}
+          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/ghcr.io/dexidp/dex
+{{- end }}
+          tag: v2.44.0-p180-2
+
         imagePullSecrets:
         - name: sca-docker-registry-secret
       redis:
         image:
-          repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/public.ecr.aws/docker/library/redis'
+{{- if not (empty $helmRepoRegistry) }}
+          repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/public.ecr.aws/docker/library/redis
+{{- else }}
+          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/public.ecr.aws/docker/library/redis
+{{- end }}
+          tag: 8.2.2-alpine-p180
+
         imagePullSecrets:
         - name: sca-docker-registry-secret
         exporter:
           image:
-            repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/ghcr.io/oliver006/redis_exporter'
+{{- if not (empty $helmRepoRegistry) }}
+            repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/ghcr.io/oliver006/redis_exporter
+{{- else }}
+            repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/ghcr.io/oliver006/redis_exporter
+{{- end }}
+            tag: 8.2.2-alpine-p180
+
           imagePullSecrets:
           - name: sca-docker-registry-secret
       redis-ha:
         image:
-          repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/public.ecr.aws/docker/library/redis'
+{{- if not (empty $helmRepoRegistry) }}
+          repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/public.ecr.aws/docker/library/redis
+{{- else }}
+          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/public.ecr.aws/docker/library/redis
+{{- end }}
+
         imagePullSecrets:
         - name: sca-docker-registry-secret
       redisSecretInit:
@@ -137,49 +224,207 @@ releases:
         - name: sca-docker-registry-secret
   - argocd-image-updater:
       image:
-        repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoprojlabs/argocd-image-updater'
+{{- if not (empty $helmRepoRegistry) }}
+        repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/quay.io/argoprojlabs/argocd-image-updater
+{{- else }}
+        repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoprojlabs/argocd-image-updater
+{{- end }}
+        tag: "v1.0.2-p180-3"
+
       imagePullSecrets:
       - name: sca-docker-registry-secret
+      config:
+        registries:
+          - name: sca180acr
+{{- if not (empty $helmRepoRegistry) }}
+            api_url: http://{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}
+            prefix: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}
+{{- else }}
+            api_url: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}
+            prefix: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}
+{{- end }}
+            defaultns: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
+            default: true
+            insecure: true
+            credentials: pullsecret:{{ .Namespace | default .Values.environment.releaseNamespace }}/sca-harbor-registry-secret
+
   - scaengineasocintegratorapi:
       common:
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
+  - scaenginescanmonitorapi:
+      common:
+        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
+  - scaenginefetchcve:
+      common:
+        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
   - scaenginescanapi:
       common:
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
+  - scaenginescanconfig:
+      common:
+        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
+  - scaenginescanhash:
+      common:
+        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
+  - scaenginescanpostprocessor:
+      common:
+        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
+  - scaenginescanpreprocessor:
+      common:
+        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
+  - scaenginesbomreport:
+      common:
+        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
 
   - scaargorepository:
       common:
         scaservicesecrets:
           username: {{ env "SCA_AUTOUPDATER_REGISTRY_USERNAME" | default "" }}
           password: {{ env "SCA_AUTOUPDATER_REGISTRY_PASSWORD" | default "" }}
-          url: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default "" }}
+{{- if not (empty $helmRepoRegistry) }}
+          url: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+{{- else }}
+          url: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default "" }}'
+{{- end }}
   - scadprautoupdater:
       common:
         dockerPrivateRegistry:
           secret:
             enabled: true
             helmenabled: false
+{{- if not (empty $helmRepoRegistry) }}
+            server: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+{{- else }}
             server: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
+{{- end }}
+
             username: '{{ env "SCA_AUTOUPDATER_REGISTRY_USERNAME" | default "" }}'
             password: '{{ env "SCA_AUTOUPDATER_REGISTRY_PASSWORD" | default "" }}'
             email: ""
 
   - scaargocveupdater:
       common:
+{{- if not (empty $helmRepoRegistry) }}
+        AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+        RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+{{- else }}
         AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
+        RepoUrl: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}
+{{- end }}
+{{- if not (empty $helmRepoContext) }}
+        AutoUpdaterRegistryPath: '{{ .Values.global.workload.container.image.repository }}'
+{{- else }}
         AutoUpdaterRegistryPath: '{{ .Values.environment.dockerRegistryContext }}'
-        RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
+{{- end }}
+
         namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
         AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
-        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build" }}" 
+        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build" }}"
+        replicaCount: "1"
+        ResourcesLimitsMemory: "3Gi"
+        ResourcesLimitsCpu: "2000m"
+        ResourcesRequestsMemory: "2.5Gi"
+        ResourcesRequestsCpu: "1500m"
+
 
   - scaargolibraryupdater:
       common:
+{{- if not (empty $helmRepoRegistry) }}
+        AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+        RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+{{- else }}
         AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
-        AutoUpdaterRegistryPath: '{{ .Values.environment.dockerRegistryContext }}'
-        AutoUpdaterRegistrySecretName: sca-docker-registry-secret
         RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
+{{- end }}
+{{- if not (empty $helmRepoContext) }}
+        AutoUpdaterRegistryPath: '{{ .Values.global.workload.container.image.repository }}'
+{{- else }}
+        AutoUpdaterRegistryPath: '{{ .Values.environment.dockerRegistryContext }}'
+{{- end }}
+
+        AutoUpdaterRegistrySecretName: sca-docker-registry-secret
         namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
         AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
         ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build"}}" 
+        replicaCount: "1"
+        ResourcesLimitsMemory: "2Gi"
+        ResourcesLimitsCpu: "1000m"
+        ResourcesRequestsMemory: "700Mi"
+        ResourcesRequestsCpu: "200m"
+    
+  - scacvesearchapi:
+      common:
+        workload:
+          replicaCount: 1
+          mainContainer:
+            resources:
+              limits:
+                memory: 3Gi
+                cpu: 2000m
+              requests:
+                memory: 2.5Gi
+                cpu: 1500m
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
+  - scalibrarysearchapi:
+      common:
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+
+  - keda:
+      enabled: true
+      image:
+        keda:
+{{- if not (empty $helmRepoRegistry) }}
+          registry: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}
+{{- else }}
+          registry: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}
+{{- end }}
+          repository: ghcr.io/kedacore/keda
+          tag: "2.18.3-p180-2"
+        metricsApiServer:
+{{- if not (empty $helmRepoRegistry) }}
+          registry: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}
+{{- else }}
+          registry: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}
+{{- end }}
+          repository: ghcr.io/kedacore/keda-metrics-apiserver
+          tag: "2.18.3-p180-2"
+        webhooks:
+{{- if not (empty $helmRepoRegistry) }}
+          registry: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}
+{{- else }}
+          registry: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}
+{{- end }}
+          repository: ghcr.io/kedacore/keda-admission-webhooks
+          tag: "2.18.3-p180-2"
+      imagePullSecrets:
+      - name: sca-docker-registry-secret
 

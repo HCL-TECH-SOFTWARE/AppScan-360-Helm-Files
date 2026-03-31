@@ -38,6 +38,17 @@ global:
              # CUSTOMIZE_ME:
              # The customer's supplied private key of the certificate used as the applicable external (out-of-cluster) micro services ingresses certificates
              tlsKeyAsBase64: ''
+  helm:
+    package:
+      registry: ''
+      context: ''
+  workload:
+    affiliatedSidecarsProject: appscan360
+    container:
+      image:
+        registry: ''
+        repository: ''
+        pullPolicy: IfNotPresent
   storage:
     pvc:
       linux:
@@ -101,6 +112,37 @@ global:
         # CUSTOMIZE_ME:
         # The sub domain to be used when deploying ingresses into the customer's K8S cluster (for building the host name)
         subDomain: as360
+  gateway:
+    # CUSTOMIZE_ME:
+    # The gateway class name to be used when deploying gateways into the customer's K8S cluster
+    className: istio
+    listeners:
+      tlspassthrough:
+        # CUSTOMIZE_ME:
+        # The customer's designated K8S TLS Passthrough gateway listener port to be used for AS360 installation
+        #   NOTE: This field is optional, If left empty, a factory default will be used
+        port: 8443
+      https:
+        # CUSTOMIZE_ME:
+        # The customer's designated K8S HTTPS gateway listener port to be used for AS360 installation
+        #   NOTE: This field is optional, If left empty, a factory default will be used
+        port: 443
+      http:
+        # CUSTOMIZE_ME:
+        # The customer's designated K8S HTTP gateway listener port to be used for AS360 installation
+        #   NOTE: This field is optional, If left empty, a factory default will be used
+        port: 80
+    internal:
+      private:
+        namespace: hcl-appscan-ascp
+        host:
+          # CUSTOMIZE_ME:
+          # The (main) domain to be used when deploying gateways into the customer's K8S cluster (for building the host name)
+          #   NOTE: If left empty, it will be taken from the 'global.network.domainSuffix' field
+          domain: appscan.il
+          # CUSTOMIZE_ME:
+          # The sub domain to be used when deploying gateways into the customer's K8S cluster (for building the host name)
+          subDomain: expo.ascp
   network:
     # CUSTOMIZE_ME:
     # The customer's designated (main) domain name
@@ -184,6 +226,14 @@ global:
       #   NOTE: This field is optional, If left empty, a factory default will be used
       k8sAsraNamespace: 'hcl-appscan-asra'
       # CUSTOMIZE_ME:
+      # The customer's designated K8S SCA namespace to be used for AS360 installation
+      #   NOTE: This field is optional, If left empty, a factory default will be used
+      k8sScaNamespace: 'hcl-appscan-sca'
+      # CUSTOMIZE_ME:
+      # The customer's designated K8S DTCS namespace to be used for AS360 installation
+      #   NOTE: This field is optional, If left empty, a factory default will be used
+      k8sDtcsNamespace: 'hcl-appscan-dast'
+      # CUSTOMIZE_ME:
       # The customer's OpenIdConnect (OIDC) client ID (used to establish a connection with the OIDC server)
       # NOTES:
       #   1. This setting should be configured through the UI, it is exposed here only to allow troubleshooting misconfigured settings that were set through the UI, and caused account lockout
@@ -197,6 +247,17 @@ global:
       #   2. Once set, it has precedence over the UI settings
       #   3. IFF set, ALL other OIDC related parameters must be set as well in order to actually override the UI related settings
       oidcAuthority: ''
+      # CUSTOMIZE_ME:
+      #   Description: Defines the total size of the tunnel server pool available for load balancing. This integer determines the upper limit of the round-robin index used when routing connections.
+      #   Impact: The system will generate hostnames using indices from 0 up to TunnelHostMaxId - 1.
+      #   Constraint: Ensure this value matches the number of DNS records provisioning the environment.
+      #   Example: A value of 5 will enable indices 0 through 4.
+      tunnelHostMaxId: ''
+      # CUSTOMIZE_ME:
+      #   Description: The hostname template string used to route traffic to specific tunnel server instances. This pattern must contain the placeholder {0}, which the system replaces with the 3-digit, zero-padded server index (e.g., 000, 001).
+      #   Constraint: The domain part of the pattern must match the DNS entries mapped to the Kubernetes Gateway listener IP.
+      #   Example: tap-{0}.appscan360.example.com resolves to tap-000.appscan360.example.com, tap-001.appscan360.example.com, etc.
+      tunnelHostNamePattern: ''
     confidential:
       # CUSTOMIZE_ME:
       # The customer's MSSQL data store (database) connection string (used to established a connection with the database)
@@ -244,19 +305,19 @@ ascp-domain-challenger:
 ascp-egress-gatekeeper:
   enabled: true
 
-ascp-mr-tasks-manager:
+ascp-be-tasks-manager:
   enabled: true
 
-ascp-mr-user-api:
+ascp-be-user-api:
   enabled: true
 
-ascp-mr-scanners-api:
+ascp-be-scanners-api:
   enabled: true
 
-ascp-mr-presence-api:
+ascp-be-presence-api:
   enabled: true
 
-ascp-mr-iast-api:
+ascp-be-iast-api:
   enabled: true
 
 scaenginefetchcve:

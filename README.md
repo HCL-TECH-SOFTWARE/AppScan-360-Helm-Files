@@ -52,7 +52,6 @@
                     }               
 
 
-
 ## Git Installation 
 
 The repository for **AppScan-360-Helm-Files** is hosted on a GitHub server. To clone the repository, follow these steps:
@@ -65,7 +64,8 @@ AppScan-360-Helm-Files
 ├── Helm.d
 ├──  ├── helmfile-ASCP.yaml.gotmpl
 ├──  ├── helmfile-ASRA.yaml.gotmpl
-│    ├── helmfile-SCA.yaml.gotmpl
+├──  ├── helmfile-DTCS.yaml.gotmpl
+├──  ├── helmfile-SCA.yaml.gotmpl
 ├──  └── helmFileCustomization
 ├──         ├── singular-singular.clusterKit-Sample.yaml
 └── helmfile.yaml.gotmpl
@@ -122,6 +122,26 @@ export SCA_AUTOUPDATER_REGISTRY_PASSWORD=<HCL_HARBOR_PASSWORD>
 ```
 Important: If you do not set up automatic updates, you must update the vulnerability database manually.
 
+#### Optional: Exclude DTCS Component
+Dast Template Converter Service (DTCS) is included when you install AppScan 360°
+##### Note: DTCS is included in the AppScan 360° by default.
+
+If you want to exclude DTCS during the installation then need to use below command
+
+```bash
+  excludeDTCS=true helmfile sync
+```
+To uninstall AppScan360 along with DTCS:
+
+```bash
+  excludeDTCS=true helmfile destroy
+```
+
+##### Note: DTCS needs to be skipped and SCA need to be added use below command
+```bash
+   includeSCA=true excludeDTCS=true helmfile sync
+```
+
 #### Version support using Git tags and archives
 AppScan 360° supports version-controlled installation using Git tags and archives.
 To clone the latest version of AppScan 360° using Git:
@@ -167,6 +187,7 @@ Example release names:
 - asra (namespace: hcl-appscan-asra)
 - appscan360-ascp (namespace: hcl-appscan-ascp)
 - scaservices (namespace: hcl-appscan-sca)
+- dtcsservices (namespace: hcl-appscan-dast)
 
 You can find the available revision numbers using:
 ```bash 
