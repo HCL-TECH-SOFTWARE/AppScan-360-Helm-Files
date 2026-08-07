@@ -19,7 +19,7 @@ environments:
   default:
     values:
     - global:
-        version: 2.10.1-178GA
+        version: 2.12.0-181GA
     - helmFileCustomizations/singular-singular.clusterKit.yaml
     - asraHelmRegistry: {{ env "ASRA_HELM_REG" | default "hclcr.io" }}
       asraHelmRepo: hcl_asra/{{ env "ASRA_HELM_REPO" | default "appscan360/as360-k8s-helm-packages" }}/asra

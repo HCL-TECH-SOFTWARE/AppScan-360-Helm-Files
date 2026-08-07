@@ -23,6 +23,9 @@ global:
              # CUSTOMIZE_ME:
              # The customer's supplied CA certificate used for signing OIDCs based service(s)
              caCrtForOIDCsAsBase64: ''
+            # CUSTOMIZE_ME:
+            # The customer's supplied CA certificate used for signing OTELs (Open Telemetry) based service(s)
+             caCrtForOTELsAsBase64: ''
        ingress:
          # CUSTOMIZE_ME:
          # Indication whether to use a customer given certificate as the applicable external (out-of-cluster) micro services ingresses certificates, or not
@@ -94,24 +97,6 @@ global:
         name: appscan-root-ca-cert
         duration: 26280h0m0s # 3 years
         renewBefore: 8760h0m0s # 1 year
-  ingress:
-    controller:
-      capabilities:
-        # CUSTOMIZE_ME:
-        # Indicates whether the Ingress Controller is based on NGINX, or the SSL onload (HTTPS backend protocol) is supported by the ingress controller (not via an annotation, but by the controller itself!), or not
-        isHttpsBackendProtocolSupported: true
-    internal:
-      # CUSTOMIZE_ME:
-      # The ingress class name to be used when deploying ingresses into the customer's K8S cluster
-      class: nginx
-      host:
-        # CUSTOMIZE_ME:
-        # The (main) domain to be used when deploying ingresses into the customer's K8S cluster (for building the host name)
-        #   NOTE: If left empty, it will be taken from the 'global.network.domainSuffix' field
-        domain: appscan.com
-        # CUSTOMIZE_ME:
-        # The sub domain to be used when deploying ingresses into the customer's K8S cluster (for building the host name)
-        subDomain: as360
   gateway:
     # CUSTOMIZE_ME:
     # The gateway class name to be used when deploying gateways into the customer's K8S cluster
@@ -258,10 +243,27 @@ global:
       #   Constraint: The domain part of the pattern must match the DNS entries mapped to the Kubernetes Gateway listener IP.
       #   Example: tap-{0}.appscan360.example.com resolves to tap-000.appscan360.example.com, tap-001.appscan360.example.com, etc.
       tunnelHostNamePattern: ''
+            # CUSTOMIZE_ME:
+      # The customer's designated RDBMS (e.g., MSSQL) going to be used as the AS360 data store
+      # NOTES:
+      #   1. The valid values for this parameter are 'SqlServer' (MSSQL) and 'PostgreSql' (PostgreSQL), defaulting to 'SqlServer'
+      #   2. This field is optional, If left empty, the MSSQL ('SqlServer') will be used as the default data store
+      dbProvider: 'SqlServer'
+      # CUSTOMIZE_ME:
+      # The customer's designated Application Performance Monitoring (APM) solution OpenTelemetry endpoint URL, to which the AS360 micro services will send their telemetry data (logs and metrics), if applicable
+      # NOTES:
+      #   1. In case the OpenTelemetry endpoint is not specified, the whole OpenTelemetry integration will be disabled, regardless of the 'enableOpenTelemetryLogs' and 'enableOpenTelemetryMetrics' settings
+      #   2. The expected tunnel for sending telemetry data to the OpenTelemetry collector is gRPC, and the expected port is 4317 (although it can be configured differently on the OpenTelemetry collector side), so the URL should be in the format of 'http://<opentelemetry-collector-host>:4317'
+      openTelemetryEndpoint: ''
+      openTelemetryEnableLogs: 'False'
+      openTelemetryEnableMetrics: 'False'
     confidential:
       # CUSTOMIZE_ME:
       # The customer's MSSQL data store (database) connection string (used to established a connection with the database)
       defaultConnection: ''
+      # CUSTOMIZE_ME:
+      # The customer's PostgreSQL data store (database) connection string (used to established a connection with the database), mutually exclusive with the 'defaultConnection' parameter, to be used IFF 'PostgreSql' is selected as the db provider
+      postgres: ''
       # CUSTOMIZE_ME:
       # The customer's LDAP server/service password (for establishing connection)
       # NOTES:
@@ -282,44 +284,6 @@ global:
       #   2. Once set, it has precedence over the UI settings
       #   3. IFF set, ALL other OIDC related parameters must be set as well in order to actually override the UI related settings
       oidcClientSecret: ''
-      #
-      # Below entries are not required for ASOP/AS360
-      #
-      opsConsoleDPKey: ''
-      licenseApiKey: ''
-      githubClientSecret: ''
-common:
-  ingress:
-    enabled: false
-  service:
-    enabled: false
-  helmHooks:
-    rbacBaseName: helm-hooks-rbac
-
-ascp-user-portal-ui:
-  enabled: true
-
-ascp-domain-challenger:
-  enabled: true
-
-ascp-egress-gatekeeper:
-  enabled: true
-
-ascp-be-tasks-manager:
-  enabled: true
-
-ascp-be-user-api:
-  enabled: true
-
-ascp-be-scanners-api:
-  enabled: true
-
-ascp-be-presence-api:
-  enabled: true
-
-ascp-be-iast-api:
-  enabled: true
-
 scaenginefetchcve:
   common:
     # CUSTOMIZE_ME:
@@ -327,6 +291,8 @@ scaenginefetchcve:
     # If the connection string contains a comma, escape it with a backslash (\,)
     scaservicesecrets:
       ConnectionStrings__ScaAggregationDB: ''
+    scaserviceenv:
+      DatabaseProvider: "SqlServer" # CUSTOMIZE_ME: Set the database provider to be used by SCA Engine Scan Monitor API, valid values are "PostgreSQL" or "SqlServer"
 
 scaenginescanmonitorapi:
   common:
@@ -335,3 +301,5 @@ scaenginescanmonitorapi:
       # The customer's MSSQL data store (database) connection string (used to established a connection with the database)
       # If the connection string contains a comma, escape it with a backslash (\,).
       ConnectionStrings__ScaEngineDatabase: ''
+    scaserviceenv:
+      DatabaseProvider: "SqlServer" # CUSTOMIZE_ME: Set the database provider to be used by SCA Engine Scan Monitor API, valid values are "PostgreSQL" or "SqlServer"

@@ -64,7 +64,7 @@ releases:
 {{- else }}
     chart: '{{ .Values.dastHelmRepositoryName }}/{{ .Values.dastHelmRepo }}/dast-template-service'
 {{- end }}
-    version: '1.0.0-8-a360'
+    version: '1.0.0-13-a360'
 
     values:
       - helmFileCustomizations/{{ .Values.global.runtime.siteName }}-{{ .Values.global.runtime.clusterName }}.clusterKit.yaml
@@ -74,11 +74,13 @@ releases:
 {{- if not (empty $helmRepoRegistry) }}
               image:
                 registry: {{ .Values.global.workload.container.image.registry }}
-                repository: {{ .Values.global.workload.container.image.repository }}/dast-template-service
+                repository: {{ .Values.global.workload.container.image.repository }}
+                name: dast-template-service
 {{- else }}
               image:
                 registry: {{ .Values.dastImageRegistry }}
-                repository: {{ .Values.dastImageRepo }}/dast-template-service
+                repository: {{ .Values.dastImageRepo }} 
+                name: dast-template-service
 {{- end }}
                 dockerPrivateRegistry:
                   secret:

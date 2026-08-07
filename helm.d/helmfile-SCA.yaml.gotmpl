@@ -46,7 +46,7 @@ environments:
         ascpNamespace: hcl-appscan-ascp
         dockerRegistryAddress: hclcr.io
         dockerRegistryContext: "appscan360/as360-k8s-docker-images"
-        autoupdaterImageTag: "newest-build-2.1.0"
+        autoupdaterImageTag: "newest-build-2.2.0"
         autoscaling: "false"
 ---
 helmDefaults:
@@ -62,10 +62,6 @@ repositories:
 - name: hclcr
   url: hclcr.io
   oci: true
-# *** Non production/customer repositories (to be removed in formal publication) - BEGIN ***
-- name: scaacr
-  url: crsca180globalprodeus.azurecr.io
-  oci: true
 ---
 
 {{- $helmRepoRegistry := default "" -}}
@@ -75,6 +71,26 @@ repositories:
   {{- $helmRepoRegistry = .Values.global.helm.package.registry | default $helmRepoRegistry -}}
   {{- $helmRepoContext = .Values.global.helm.package.context | default $helmRepoContext -}}
 {{- end }}
+
+{{- $openTelemetryEndpoint := default "" -}}
+{{- $openTelemetryEnable := default "false" -}}
+{{- $openTelemetryEnableLogs := default "false" -}}
+{{- $openTelemetryEnableMetrics := default "false" -}}
+
+{{- if hasKey .Values.global.configuration "disclosed" }}
+  {{- $openTelemetryEndpoint = .Values.global.configuration.disclosed.openTelemetryEndpoint | default $openTelemetryEndpoint -}}
+  {{- $openTelemetryEnableLogs = .Values.global.configuration.disclosed.openTelemetryEnableLogs | default $openTelemetryEnableLogs -}}
+  {{- $openTelemetryEnableMetrics = .Values.global.configuration.disclosed.openTelemetryEnableMetrics | default $openTelemetryEnableMetrics -}}
+  {{- if not (empty $openTelemetryEndpoint) }}
+    {{- $openTelemetryEnable = "true" -}}
+  {{- else }}
+    {{- $openTelemetryEnableMetrics = "false" -}}
+  {{- end }}
+{{- end }}
+
+
+
+
 
 releases:
 - name: 'scaservices'
@@ -109,11 +125,27 @@ releases:
   chart: "{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/scadeployment"
 {{- end }}
 
-
-  version: '2.1.0-20260305150443305-fed-release-ubuntu-2204'
+  version: '2.2.0-20260715110755730-fed-release-rhel-ubi-9'
   values:
   - helmFileCustomizations/{{ .Values.global.runtime.siteName }}-{{ .Values.global.runtime.clusterName }}.clusterKit.yaml
   - global:
+      ca:
+        intermediate:
+          enabled: false
+        seed:
+          enabled: false
+
+      customer:
+        certificate:
+          ca:
+            # CUSTOMIZE_ME:
+            # Indication whether to use customer given CA certificates, or not
+            enabled: false
+          ingress:
+            # CUSTOMIZE_ME:
+            # Indication whether to use a customer given certificate as the applicable external (out-of-cluster) micro services ingresses certificates, or not
+            enabled: false
+
       workload:
         container:
           image:
@@ -169,7 +201,7 @@ releases:
 {{- else }}
           repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoproj/argocd
 {{- end }}
-          tag: "v3.2.3-p180-2"
+          tag: "v3.4.2-p180"
 
         imagePullSecrets:
         - name: sca-docker-registry-secret
@@ -180,11 +212,12 @@ releases:
 {{- else }}
           repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/ghcr.io/dexidp/dex
 {{- end }}
-          tag: v2.44.0-p180-2
+          tag: v2.45.1
 
         imagePullSecrets:
         - name: sca-docker-registry-secret
       redis:
+        enabled: true
         image:
 {{- if not (empty $helmRepoRegistry) }}
           repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/public.ecr.aws/docker/library/redis
@@ -217,6 +250,9 @@ releases:
         imagePullSecrets:
         - name: sca-docker-registry-secret
       redisSecretInit:
+        enabled: true
+        containerSecurityContext:
+          runAsUser: 1001
         imagePullSecrets:
         - name: sca-docker-registry-secret
       controller:
@@ -229,7 +265,7 @@ releases:
 {{- else }}
         repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoprojlabs/argocd-image-updater
 {{- end }}
-        tag: "v1.0.2-p180-3"
+        tag: "v1.1.2-p180"
 
       imagePullSecrets:
       - name: sca-docker-registry-secret
@@ -250,33 +286,97 @@ releases:
 
   - scaengineasocintegratorapi:
       common:
+        workload:
+          volumesAndMounts:
+            mountAppSelfIdentityCertificateSecret: false
+            mountCustomerCaCertificatesSecret: false
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaservicesecretexternal:
+          EncryptionConfiguration__EncryptionKey: "Q3OIv0nz2lApjRM/SVuk9QQ9fwJ0WYYx"
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.AsocIntegratorAPI"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
 
   - scaenginescanmonitorapi:
       common:
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.ScanMonitorAPI"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
 
   - scaenginefetchcve:
       common:
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.FetchCve"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
 
   - scaenginescanapi:
       common:
+        workload:
+          volumesAndMounts:
+            mountAppSelfIdentityCertificateSecret: false
+            mountCustomerCaCertificatesSecret: false
+        scaascptrigger:
+          enabled: false
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
+        scaservicesecretexternal:
+          EncryptionConfiguration__EncryptionKey: "Q3OIv0nz2lApjRM/SVuk9QQ9fwJ0WYYx"
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.ScanAPI"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
 
   - scaenginescanconfig:
       common:
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.ScanConfig"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
 
   - scaenginescanhash:
       common:
@@ -289,18 +389,48 @@ releases:
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.ScanPostProcessor"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
 
   - scaenginescanpreprocessor:
       common:
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.ScanPreprocessor"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
 
   - scaenginesbomreport:
       common:
         ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.SbomReport"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
 
   - scaargorepository:
       common:
@@ -345,12 +475,39 @@ releases:
 
         namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
         AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
-        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build" }}"
+        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build-2.2.0" }}"
         replicaCount: "1"
         ResourcesLimitsMemory: "3Gi"
         ResourcesLimitsCpu: "2000m"
         ResourcesRequestsMemory: "2.5Gi"
         ResourcesRequestsCpu: "1500m"
+        post_sync:
+          enabled: true
+          post_sync_job_name: "proactive-alert-postsync-trigger"
+          pullSecrets:
+            - name: sca-docker-registry-secret
+          containers:
+            - name: "proactive-curl-pod"
+              image:
+              {{- if not (empty $helmRepoContext) }}
+                repository: '{{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/curl'
+              {{- else }}
+                repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/curl'
+              {{- end }}
+                tag: 8.14.1-p180-2
+              cmd: ["curl"]
+              args:
+                - "-k"
+                - "-v"
+                - "-X"
+                - "POST"
+                - "http://engine-asocintegratorapi.{{ .Namespace | default .Values.environment.releaseNamespace }}.svc:18082/api/SecurityIssue/SendProactiveAlert"
+                - "-H"
+                - "accept: */*"
+                - "-d"
+                - "{}"
+          backoffLimit: 2 
+
 
 
   - scaargolibraryupdater:
@@ -371,7 +528,7 @@ releases:
         AutoUpdaterRegistrySecretName: sca-docker-registry-secret
         namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
         AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
-        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build"}}" 
+        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build-2.2.0"}}" 
         replicaCount: "1"
         ResourcesLimitsMemory: "2Gi"
         ResourcesLimitsCpu: "1000m"
@@ -408,7 +565,7 @@ releases:
           registry: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}
 {{- end }}
           repository: ghcr.io/kedacore/keda
-          tag: "2.18.3-p180-2"
+          tag: "2.19.0"
         metricsApiServer:
 {{- if not (empty $helmRepoRegistry) }}
           registry: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}
@@ -416,7 +573,7 @@ releases:
           registry: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}
 {{- end }}
           repository: ghcr.io/kedacore/keda-metrics-apiserver
-          tag: "2.18.3-p180-2"
+          tag: "2.19.0"
         webhooks:
 {{- if not (empty $helmRepoRegistry) }}
           registry: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}
@@ -424,7 +581,7 @@ releases:
           registry: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}
 {{- end }}
           repository: ghcr.io/kedacore/keda-admission-webhooks
-          tag: "2.18.3-p180-2"
+          tag: "2.19.0"
       imagePullSecrets:
       - name: sca-docker-registry-secret
 
