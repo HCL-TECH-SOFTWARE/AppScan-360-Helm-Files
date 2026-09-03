@@ -556,7 +556,7 @@ releases:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
 
   - keda:
-      enabled: true
+      enabled: {{ .Values.environment.autoscaling | default "false"}}
       image:
         keda:
 {{- if not (empty $helmRepoRegistry) }}
@@ -584,4 +584,3 @@ releases:
           tag: "2.19.0"
       imagePullSecrets:
       - name: sca-docker-registry-secret
-
