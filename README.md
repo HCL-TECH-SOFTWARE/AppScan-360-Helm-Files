@@ -56,6 +56,8 @@
 
 The repository for **AppScan-360-Helm-Files** is hosted on a GitHub server. To clone the repository, follow these steps:
 
+git clone https://github.com/HCL-TECH-SOFTWARE/AppScan-360-Helm-Files
+
 ### Repository Structure
 Once the repository is cloned, you will find the following directory structure.
 
