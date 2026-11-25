@@ -56,20 +56,24 @@
 
 The repository for **AppScan-360-Helm-Files** is hosted on a GitHub server. To clone the repository, follow these steps:
 
-git clone https://github.com/HCL-TECH-SOFTWARE/AppScan-360-Helm-Files
-
 ### Repository Structure
 Once the repository is cloned, you will find the following directory structure.
 
 ```bash
 AppScan-360-Helm-Files
+├── Copy Artifacts
+│   ├── artifactList.txt        # List of images/charts to sync
+│   ├── copy-artifacts.sh       # The synchronization script
 ├── Helm.d
-├──  ├── helmfile-ASCP.yaml.gotmpl
-├──  ├── helmfile-ASRA.yaml.gotmpl
-├──  ├── helmfile-DTCS.yaml.gotmpl
-├──  ├── helmfile-SCA.yaml.gotmpl
-├──  └── helmFileCustomization
-├──         ├── singular-singular.clusterKit-Sample.yaml
+├──  ├── ascp
+├──       ├── helmfile.yaml.gotmpl
+├──  ├── asra
+├──       ├── helmfile.yaml.gotmpl
+├──  ├── dtcs
+├──       ├── helmfile.yaml.gotmpl
+├──  ├── sca
+├──       ├── helmfile.yaml.gotmpl
+├──  ├── helmfile-Warning.yaml.gotmpl
 └── helmfile.yaml.gotmpl
 ```
       
@@ -89,7 +93,7 @@ For each upgrade, run git pull inside the cloned repository(AppScan-360-Helm-Fil
 2. Run the following commands:
 
     ```bash
-     helmfile sync
+     helmfile sync --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
     ```
 
 #### Uninstall AppScan360:
@@ -97,7 +101,7 @@ For each upgrade, run git pull inside the cloned repository(AppScan-360-Helm-Fil
 2. Run the following commands:
  
     ```bash
-     helmfile destroy
+     helmfile destroy --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
     ```
 
 
@@ -108,12 +112,12 @@ Software Composition Analysis (SCA) is included when you install AppScan 360° w
 To install AppScan360 along with SCA:
 
 ```bash
-  includeSCA=true helmfile sync
+  includeSCA=true helmfile sync --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
 ```
 To uninstall AppScan360 along with SCA:
 
 ```bash
-  includeSCA=true helmfile destroy
+  includeSCA=true helmfile destroy --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
 ```
 
 To enable automatic updates of the Software Composition Analysis (SCA) vulnerability database, set the following environment variables that point to the HCL Harbor registry with the correct credentials.
@@ -131,17 +135,35 @@ Dast Template Converter Service (DTCS) is included when you install AppScan 360�
 If you want to exclude DTCS during the installation then need to use below command
 
 ```bash
-  excludeDTCS=true helmfile sync
+  excludeDTCS=true helmfile sync --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
 ```
 To uninstall AppScan360 along with DTCS:
 
 ```bash
-  excludeDTCS=true helmfile destroy
+  excludeDTCS=true helmfile destroy --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
 ```
 
 ##### Note: DTCS needs to be skipped and SCA need to be added use below command
 ```bash
-   includeSCA=true excludeDTCS=true helmfile sync
+   includeSCA=true excludeDTCS=true helmfile -e as360-stage sync
+```
+
+##### Note: For DTCS and SCA the parameters needs to be set even in singular file
+```bash
+   global:
+  runtime:
+    customerName: ASOP
+    siteName: singular
+    clusterName: singular
+  affiliatedSubsidiariesServices:
+    dtcs:
+      # CUSTOMIZE_ME:
+      # Indication whether the DTCS affiliated subsidiary service is installed, or not
+      enabled: true
+    sca:
+      # CUSTOMIZE_ME:
+      # Indication whether the SCA affiliated subsidiary service is installed, or not
+      enabled: false
 ```
 
 #### Version support using Git tags and archives
@@ -200,6 +222,5 @@ helm history <release-name> -n <namespace>
 Common issues that can be encountered:
 
 1. **no state file found. It must be named helmfile.d/*** : When we navigate inside AppScan-360-Helm-Files -> helm.d -> run helmfile sync, this command needs to be run from AppScan-360-Helm-Files
-2. **in ./helmfile.yaml: in .helmfiles[0]: in helm.d/helmfile-ASCP.yaml: failed processing release appscan360-ascp**: values file matching "helmFileCustomizations/singular-singular.clusterKit.yaml" does not exist in ".": When singular-singular.clusterKit.yaml is missing
-3. **Failed to pull helm-packages or docker images**: When docker login is missing or HCLCR_USERNAME and HCLCR_PASSWORD environment variable is missing
-4. **Failed to get pull secret**: When .docker/config.json file is missing or AS360_KNI_JSON_CONFIG_AS_BASE64 with appropriate value is not defined
+2. **Failed to pull helm-packages or docker images**: When docker login is missing or HCLCR_USERNAME and HCLCR_PASSWORD environment variable is missing
+3. **Failed to get pull secret**: When .docker/config.json file is missing or AS360_KNI_JSON_CONFIG_AS_BASE64 with appropriate value is not defined

@@ -1,0 +1,66 @@
+#
+# Prerequisites:
+#   (*) Clone the designated AS360 KNI git repository, or pull from the applicable remote repository using the oras CLI tool, and unpack it into the appropriate local directory
+#   (*) Ensure you are logged in the designated docker registry (e.g., via using the 'docker login' command),
+#       or define 2 environment variables holding the registry credentials: HCLCR_USERNAME and HCLCR_PASSWORD
+#   (*) Ensure you are running from a folder that contains the helmfile.d folder
+#
+# Usage:
+#   (*) Install: helmfile sync --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
+#     Ensure one of the following:
+#       1. Define an environment variable as follows:
+#         Name: AS360_KNI_JSON_CONFIG_AS_BASE64
+#         Value: The designated registry docker config file, encoded in Base64
+#       2. Verify an already configured docker config file is residing under the home folder of the user (e.g., ~/.docker/config.json)
+#   (*) Uninstall: helmfile destroy --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
+#   (*) Control the namespace: add the following clause '-n <namespace>' to the helmfile command
+#
+
+
+environments:
+  default:
+    values:
+    - environment:
+        ### ~~~ OVERRIDABLE-SECTION-BEGIN ~~~
+        helmRepositoryName: hclcr
+        helmRepositoryAddress: hclcr.io
+        helmRepositoryContext: appscan360/as360-k8s-helm-packages
+        helmRepositoryOciEnabled: true
+        releaseName: asra
+        releaseNamespace: hcl-appscan-asra
+        releaseVersion: 3.0.0-33GA
+        ### ~~~ OVERRIDABLE-SECTION-END ~~~
+
+---
+
+repositories:
+- name: {{ .Values.environment.helmRepositoryName }}
+  url: {{ .Values.environment.helmRepositoryAddress }}
+  oci: {{ .Values.environment.helmRepositoryOciEnabled }}
+
+helmDefaults:
+  atomic: true
+  cleanupOnFail: false
+  createNamespace: true
+  deleteWait: true
+  timeout: 600
+  wait: true
+  waitForJobs: true
+
+releases:
+- name: {{ .Values.environment.releaseName }}
+  namespace: '{{ .Values.environment.releaseNamespace }}'
+  chart: '{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/asra'
+  version: '{{ .Values.environment.releaseVersion }}'
+  values:
+  - {{ toYaml .Values | nindent 4 }}
+  - global:
+      workload:
+        dockerPrivateRegistry:
+          secret:
+            data:
+{{- if env "AS360_KNI_JSON_CONFIG_AS_BASE64" }}
+              jsonConfigAsBase64: {{ env "AS360_KNI_JSON_CONFIG_AS_BASE64" }}
+{{- else }}
+              jsonConfigAsBase64: {{ ((readFile (printf "%s/%s" (env "HOME") ".docker/config.json")) | b64enc) }}
+{{- end }}

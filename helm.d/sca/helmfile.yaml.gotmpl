@@ -3,13 +3,14 @@
 #   (*) Ensure you are running from a folder that contains the helmfile.d folder
 #
 # Usage:
-#   (*) Install: helmfile sync
+#   (*) Install: helmfile sync --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
+#     Note: Another option is to use the --values flag instead of the --state-values-file flag
 #     Ensure the following:
 #       1. Define an environment variable as follows:
 #         Name: AS360_KNI_JSON_CONFIG_AS_BASE64
 #         Value: The designated registry docker config file, encoded in Base64
 #         Name: SCA_AUTOUPDATER_REGISTRY_ADDRESS
-#         Value: The address of the registry to be used by the SCA AutoUpdater. 
+#         Value: The address of the registry to be used by the SCA AutoUpdater.
 #         This variable is OPTIONAL and  only needed needed only if you want the auto-updater feature to be enabled.
 #         Name: SCA_AUTOUPDATER_REGISTRY_USERNAME
 #         Value: The username of the registry to be used by the SCA AutoUpdater.
@@ -17,7 +18,18 @@
 #         Name: SCA_AUTOUPDATER_REGISTRY_PASSWORD
 #         Value: The password of the registry to be used by the SCA AutoUpdater.
 #         This variable is OPTIONAL and needed only if you want the auto-updater feature to be enabled.
-#       2. Values for the below variables are a pre-requisite and needs to be populated in helmfile.d/scaKit.yaml:
+#       2. Verify an already configured docker config file is residing under the home folder of the user (e.g., ~/.docker/config.json)
+#       3. In case the environment variables need to be changed, add another parameter to the command line:
+#         --state-values-file <path-to-your-environment-customization-file (customization file advised name => singular-singular.clusterKit.yaml.gotmpl)>
+#         3.1. An example of the file content:
+            # singular-singular.clusterKit.yaml.gotmpl:
+            # -----------------------------------------
+            # environment:
+            #   helmRepositoryName: "my-custom-helm"
+            #   helmRepositoryAddress: "new-helm-registry.local"
+            #   helmRepositoryContext: "custom-project/charts"
+            #   helmRepositoryOciEnabled: true/false
+#       4. Values for the below variables are a pre-requisite and needs to be populated in helmfile.d/scaKit.yaml:
 #         Name: requestedCapacity
 #         Value: The customer's K8S shared storage designated size, to be calculated before installation
 #         Name: storageClassName
@@ -27,55 +39,83 @@
 #         Name: ConnectionStrings__ScaAggregationDB
 #         Value: The connection string for the SCA Aggregate database
 #
-#   (*) Uninstall: helmfile destroy
+#   (*) Uninstall: helmfile destroy  --state-values-file <path-to-your-values-customization-file (customization file advised name => singular-singular.clusterKit.yaml)>
+#   (*) Control the namespace: add the following clause '-n <namespace>' to the helmfile command
 #
 environments:
   default:
     values:
-    - helmFileCustomizations/singular-singular.clusterKit.yaml
     - global:
         multiTenantDeploymentDifferentiator: ''
+        isNonProductionDeployment: false
         runtime:
           siteName: singular
           clusterName: singular
     - environment:
+        ### ~~~ OVERRIDABLE-SECTION-BEGIN ~~~
         helmRepositoryName: hclcr
+        helmRepositoryAddress: hclcr.io
         helmRepositoryContext: appscan360/as360-k8s-helm-packages
+        helmRepositoryOciEnabled: true
         releaseName: appscan360-sca
+        releaseVersion: 2.3.0
         releaseNamespace: hcl-appscan-sca
-        ascpNamespace: hcl-appscan-ascp
         dockerRegistryAddress: hclcr.io
         dockerRegistryContext: "appscan360/as360-k8s-docker-images"
-        autoupdaterImageTag: "newest-build-2.2.0"
+        autoupdaterImageTag: "newest-build-2.3.0"
         autoscaling: "false"
+        ### ~~~ OVERRIDABLE-SECTION-END ~~~
+
 ---
 helmDefaults:
   cleanupOnFail: true
   wait: true
   waitForJobs: true
-  atomic: true
-  timeout: 1200
+  timeout: 1800
   createNamespace: true
   #deleteWait: true
+  syncArgs:
+  - "--rollback-on-failure"
+  - "--server-side=true"
+  - "--force-conflicts"
+  - "--reset-values"
+  # Note: The destroyArgs section isn't a valid section in this context!!!
+  # destroyArgs:
+  # - "--skip-charts"
+  # - "--skip-deps"
+  # - "--skip-refresh"
 
 repositories:
-- name: hclcr
-  url: hclcr.io
-  oci: true
+- name: {{ .Values.environment.helmRepositoryName }}
+  url: {{ .Values.environment.helmRepositoryAddress }}
+  oci: {{ .Values.environment.helmRepositoryOciEnabled }}
 ---
 
 {{- $helmRepoRegistry := default "" -}}
 {{- $helmRepoContext := default "" -}}
 
-{{- if hasKey .Values.global "helm" }}
-  {{- $helmRepoRegistry = .Values.global.helm.package.registry | default $helmRepoRegistry -}}
-  {{- $helmRepoContext = .Values.global.helm.package.context | default $helmRepoContext -}}
+{{- if hasKey .Values.environment "helmRepositoryAddress" }}
+  {{- $helmRepoRegistry = .Values.environment.helmRepositoryAddress | default $helmRepoRegistry -}}
 {{- end }}
+
+{{- if hasKey .Values.environment "helmRepositoryContext" }}
+  {{- $helmRepoContext = .Values.environment.helmRepositoryContext | default $helmRepoContext -}}
+{{- end }}
+
+{{- $workload := index .Values.global "workload" | default dict -}}
+{{- $container := index $workload "container" | default dict -}}
+{{- $image := index $container "image" | default dict -}}
+{{- $workloadImageRegistry := index $image "registry" | default .Values.environment.dockerRegistryAddress -}}
+{{- $workloadImageRepository := index $image "repository" | default .Values.environment.dockerRegistryContext -}}
 
 {{- $openTelemetryEndpoint := default "" -}}
 {{- $openTelemetryEnable := default "false" -}}
 {{- $openTelemetryEnableLogs := default "false" -}}
 {{- $openTelemetryEnableMetrics := default "false" -}}
+{{- $upstreamProxyHost := default "" -}}
+{{- $upstreamProxyPort := default "" -}}
+{{- $upstreamProxyUsername := default "" -}}
+{{- $upstreamProxyPassword := default "" -}}
 
 {{- if hasKey .Values.global.configuration "disclosed" }}
   {{- $openTelemetryEndpoint = .Values.global.configuration.disclosed.openTelemetryEndpoint | default $openTelemetryEndpoint -}}
@@ -88,6 +128,15 @@ repositories:
   {{- end }}
 {{- end }}
 
+{{- if hasKey .Values.global.configuration.disclosed "upstreamProxyHost" }}
+  {{- $upstreamProxyHost = .Values.global.configuration.disclosed.upstreamProxyHost | default $upstreamProxyHost -}}
+  {{- $upstreamProxyPort = .Values.global.configuration.disclosed.upstreamProxyPort | default $upstreamProxyPort -}}
+  {{- $upstreamProxyUsername = .Values.global.configuration.disclosed.upstreamProxyUsername | default $upstreamProxyUsername -}}
+{{- end }}
+
+{{- if hasKey .Values.global.configuration "confidential" }}
+  {{- $upstreamProxyPassword = .Values.global.configuration.confidential.upstreamProxyPassword | default $upstreamProxyPassword -}}
+{{- end }}
 
 
 
@@ -117,17 +166,22 @@ releases:
           kubectl patch crd triggerauthentications.keda.sh -n '{{ .Namespace | default .Values.environment.releaseNamespace }}' -p '{"metadata":{"finalizers":[]}}' --type=merge || true
           kubectl patch crd imageupdaters.argocd-image-updater.argoproj.io -n '{{ .Namespace | default .Values.environment.releaseNamespace }}' -p '{"metadata":{"finalizers":[]}}' --type=merge || true
           # Run any other cleanup commands
-          kubectl delete namespace '{{ .Namespace | default .Values.environment.releaseNamespace }}' --ignore-not-found=true
+          # Do not delete the namespace as part of the cleanup to avoid accidental removal of other services
+          # kubectl delete namespace '{{ .Namespace | default .Values.environment.releaseNamespace }}' --ignore-not-found=true
 
 {{- if not (empty $helmRepoRegistry) }}
-  chart: oci://{{ $helmRepoRegistry }}/{{ $helmRepoContext }}/scadeployment
+  chart: oci://{{ $helmRepoRegistry }}/{{ $helmRepoContext }}/sca
 {{- else }}
-  chart: "{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/scadeployment"
+  chart: "{{ .Values.environment.helmRepositoryName }}/{{ .Values.environment.helmRepositoryContext }}/sca"
 {{- end }}
 
-  version: '2.2.0-20260715110755730-fed-release-rhel-ubi-9'
+  version: 2.3.0-20261110093330995-fed-release-rhel-ubi-9
   values:
+{{/*
   - helmFileCustomizations/{{ .Values.global.runtime.siteName }}-{{ .Values.global.runtime.clusterName }}.clusterKit.yaml
+*/}}
+  # Converts all your --state-values directly into Helm chart values (replacement of the line above)
+  - {{ toYaml .Values | nindent 4 }}
   - global:
       ca:
         intermediate:
@@ -150,15 +204,15 @@ releases:
         container:
           image:
 {{- if not (empty $helmRepoRegistry) }}
-            registry: {{ .Values.global.workload.container.image.registry }}
-            repository: {{ .Values.global.workload.container.image.repository }}
+            registry: {{ $workloadImageRegistry }}
+            repository: {{ $workloadImageRepository }}
 {{- else }}
             registry: {{ .Values.environment.dockerRegistryAddress }}
             repository: {{ .Values.environment.dockerRegistryContext }}
 {{- end }}
 
             pullSecrets:
-            - sca-docker-registry-secret
+            - as360-secret
         dockerPrivateRegistry:
           secret:
             data:
@@ -172,109 +226,110 @@ releases:
   - rabbitmq:
       image:
 {{- if not (empty $helmRepoRegistry) }}
-        registry: {{ .Values.global.workload.container.image.registry }}
-        repository: {{ .Values.global.workload.container.image.repository }}/bitnami/rabbitmq
+        registry: {{ $workloadImageRegistry }}
+        repository: {{ $workloadImageRepository }}/rabbitmq
 {{- else }}
         registry: {{ .Values.environment.dockerRegistryAddress }}
-        repository: {{ .Values.environment.dockerRegistryContext }}/bitnami/rabbitmq
+        repository: {{ .Values.environment.dockerRegistryContext }}/rabbitmq
 {{- end }}
         tag: 4.2.2-debian-12-r1-p180
 
         pullSecrets:
-          - sca-docker-registry-secret
+          - as360-secret
       volumePermissions:
         image:
           pullSecrets:
-            - sca-docker-registry-secret
+            - as360-secret
 
   - scadpr:
       common:
         dockerPrivateRegistry:
           secret:
+            name: as360-secret
             enabled: false
             helmenabled: true
   - argo-cd:
       global:
         image:
 {{- if not (empty $helmRepoRegistry) }}
-          repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/quay.io/argoproj/argocd
+          repository: {{ $workloadImageRegistry }}/{{ $workloadImageRepository }}/argocd
 {{- else }}
-          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoproj/argocd
+          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/argocd
 {{- end }}
           tag: "v3.4.2-p180"
 
         imagePullSecrets:
-        - name: sca-docker-registry-secret
+        - name: as360-secret
       dex:
         image:
 {{- if not (empty $helmRepoRegistry) }}
-          repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/ghcr.io/dexidp/dex
+          repository: {{ $workloadImageRegistry }}/{{ $workloadImageRepository }}/dex
 {{- else }}
-          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/ghcr.io/dexidp/dex
+          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/dex
 {{- end }}
           tag: v2.45.1
 
         imagePullSecrets:
-        - name: sca-docker-registry-secret
+        - name: as360-secret
       redis:
         enabled: true
         image:
 {{- if not (empty $helmRepoRegistry) }}
-          repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/public.ecr.aws/docker/library/redis
+          repository: {{ $workloadImageRegistry }}/{{ $workloadImageRepository }}/redis
 {{- else }}
-          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/public.ecr.aws/docker/library/redis
+          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/redis
 {{- end }}
           tag: 8.2.2-alpine-p180
 
         imagePullSecrets:
-        - name: sca-docker-registry-secret
+        - name: as360-secret
         exporter:
           image:
 {{- if not (empty $helmRepoRegistry) }}
-            repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/ghcr.io/oliver006/redis_exporter
+            repository: {{ $workloadImageRegistry }}/{{ $workloadImageRepository }}/redis_exporter
 {{- else }}
-            repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/ghcr.io/oliver006/redis_exporter
+            repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/redis_exporter
 {{- end }}
             tag: 8.2.2-alpine-p180
 
           imagePullSecrets:
-          - name: sca-docker-registry-secret
+          - name: as360-secret
       redis-ha:
         image:
 {{- if not (empty $helmRepoRegistry) }}
-          repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/public.ecr.aws/docker/library/redis
+          repository: {{ $workloadImageRegistry }}/{{ $workloadImageRepository }}/redis
 {{- else }}
-          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/public.ecr.aws/docker/library/redis
+          repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/redis
 {{- end }}
 
         imagePullSecrets:
-        - name: sca-docker-registry-secret
+        - name: as360-secret
       redisSecretInit:
         enabled: true
         containerSecurityContext:
           runAsUser: 1001
         imagePullSecrets:
-        - name: sca-docker-registry-secret
+        - name: as360-secret
       controller:
         imagePullSecrets:
-        - name: sca-docker-registry-secret
+        - name: as360-secret
   - argocd-image-updater:
       image:
 {{- if not (empty $helmRepoRegistry) }}
-        repository: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/quay.io/argoprojlabs/argocd-image-updater
+        repository: {{ $workloadImageRegistry }}/{{ $workloadImageRepository }}/argocd-image-updater
 {{- else }}
-        repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/quay.io/argoprojlabs/argocd-image-updater
+        repository: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/argocd-image-updater
 {{- end }}
         tag: "v1.1.2-p180"
 
       imagePullSecrets:
-      - name: sca-docker-registry-secret
+      - name: as360-secret
       config:
         registries:
           - name: sca180acr
 {{- if not (empty $helmRepoRegistry) }}
-            api_url: http://{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}
-            prefix: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}
+            api_url: http://{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default $workloadImageRegistry }}
+            prefix: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default $workloadImageRegistry }}
 {{- else }}
             api_url: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}
             prefix: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}
@@ -290,7 +345,6 @@ releases:
           volumesAndMounts:
             mountAppSelfIdentityCertificateSecret: false
             mountCustomerCaCertificatesSecret: false
-        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
         scaservicesecretexternal:
@@ -308,7 +362,6 @@ releases:
 
   - scaenginescanmonitorapi:
       common:
-        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
         scaserviceenv:
@@ -324,7 +377,6 @@ releases:
 
   - scaenginefetchcve:
       common:
-        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
         scaserviceenv:
@@ -340,13 +392,14 @@ releases:
 
   - scaenginescanapi:
       common:
+        scapvmountcleanup:
+          enabled: false
         workload:
           volumesAndMounts:
             mountAppSelfIdentityCertificateSecret: false
             mountCustomerCaCertificatesSecret: false
         scaascptrigger:
           enabled: false
-        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         scaservicesecretexternal:
           EncryptionConfiguration__EncryptionKey: "Q3OIv0nz2lApjRM/SVuk9QQ9fwJ0WYYx"
         keda:
@@ -364,7 +417,6 @@ releases:
 
   - scaenginescanconfig:
       common:
-        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
         scaserviceenv:
@@ -380,13 +432,11 @@ releases:
 
   - scaenginescanhash:
       common:
-        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
 
   - scaenginescanpostprocessor:
       common:
-        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
         scaserviceenv:
@@ -402,7 +452,6 @@ releases:
 
   - scaenginescanpreprocessor:
       common:
-        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
         scaserviceenv:
@@ -418,7 +467,6 @@ releases:
 
   - scaenginesbomreport:
       common:
-        ascpNamespace: '{{ .Namespace | default .Values.environment.ascpNamespace }}'
         keda:
           enabled: {{ .Values.environment.autoscaling | default "false"}}
         scaserviceenv:
@@ -438,7 +486,7 @@ releases:
           username: {{ env "SCA_AUTOUPDATER_REGISTRY_USERNAME" | default "" }}
           password: {{ env "SCA_AUTOUPDATER_REGISTRY_PASSWORD" | default "" }}
 {{- if not (empty $helmRepoRegistry) }}
-          url: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+          url: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default $workloadImageRegistry }}'
 {{- else }}
           url: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default "" }}'
 {{- end }}
@@ -449,7 +497,7 @@ releases:
             enabled: true
             helmenabled: false
 {{- if not (empty $helmRepoRegistry) }}
-            server: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+            server: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default $workloadImageRegistry }}'
 {{- else }}
             server: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
 {{- end }}
@@ -461,21 +509,22 @@ releases:
   - scaargocveupdater:
       common:
 {{- if not (empty $helmRepoRegistry) }}
-        AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
-        RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+        AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default $workloadImageRegistry }}'
+        RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default $workloadImageRegistry }}'
 {{- else }}
         AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
         RepoUrl: {{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}
 {{- end }}
 {{- if not (empty $helmRepoContext) }}
-        AutoUpdaterRegistryPath: '{{ .Values.global.workload.container.image.repository }}'
+        AutoUpdaterRegistryPath: '{{ $workloadImageRepository }}'
 {{- else }}
         AutoUpdaterRegistryPath: '{{ .Values.environment.dockerRegistryContext }}'
 {{- end }}
 
         namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
         AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
-        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build-2.2.0" }}"
+        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build-2.3.0" }}"
+        AutoUpdaterRegistrySecretName: as360-secret
         replicaCount: "1"
         ResourcesLimitsMemory: "3Gi"
         ResourcesLimitsCpu: "2000m"
@@ -485,12 +534,12 @@ releases:
           enabled: true
           post_sync_job_name: "proactive-alert-postsync-trigger"
           pullSecrets:
-            - name: sca-docker-registry-secret
+            - name: as360-secret
           containers:
             - name: "proactive-curl-pod"
               image:
               {{- if not (empty $helmRepoContext) }}
-                repository: '{{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}/curl'
+                repository: '{{ $workloadImageRegistry }}/{{ $workloadImageRepository }}/curl'
               {{- else }}
                 repository: '{{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}/curl'
               {{- end }}
@@ -506,35 +555,35 @@ releases:
                 - "accept: */*"
                 - "-d"
                 - "{}"
-          backoffLimit: 2 
+          backoffLimit: 2
 
 
 
   - scaargolibraryupdater:
       common:
 {{- if not (empty $helmRepoRegistry) }}
-        AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
-        RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.global.workload.container.image.registry }}'
+        AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default $workloadImageRegistry }}'
+        RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default $workloadImageRegistry }}'
 {{- else }}
         AutoUpdaterRegistryServer: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
         RepoUrl: '{{ env "SCA_AUTOUPDATER_REGISTRY_ADDRESS" | default .Values.environment.dockerRegistryAddress }}'
 {{- end }}
 {{- if not (empty $helmRepoContext) }}
-        AutoUpdaterRegistryPath: '{{ .Values.global.workload.container.image.repository }}'
+        AutoUpdaterRegistryPath: '{{ $workloadImageRepository }}'
 {{- else }}
         AutoUpdaterRegistryPath: '{{ .Values.environment.dockerRegistryContext }}'
 {{- end }}
 
-        AutoUpdaterRegistrySecretName: sca-docker-registry-secret
+        AutoUpdaterRegistrySecretName: as360-secret
         namespace: '{{ .Namespace | default .Values.environment.releaseNamespace }}'
         AutoUpdaterHelmPath: '{{ .Values.environment.helmRepositoryContext }}'
-        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build-2.2.0"}}" 
+        ArgoImageTag: "{{ .Values.environment.autoupdaterImageTag | default "newest-build-2.3.0"}}"
         replicaCount: "1"
         ResourcesLimitsMemory: "2Gi"
         ResourcesLimitsCpu: "1000m"
         ResourcesRequestsMemory: "700Mi"
         ResourcesRequestsCpu: "200m"
-    
+
   - scacvesearchapi:
       common:
         workload:
@@ -560,27 +609,123 @@ releases:
       image:
         keda:
 {{- if not (empty $helmRepoRegistry) }}
-          registry: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}
+          registry: {{ $workloadImageRegistry }}/{{ $workloadImageRepository }}
 {{- else }}
           registry: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}
 {{- end }}
-          repository: ghcr.io/kedacore/keda
+          repository: keda
           tag: "2.19.0"
         metricsApiServer:
 {{- if not (empty $helmRepoRegistry) }}
-          registry: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}
+          registry: {{ $workloadImageRegistry }}/{{ $workloadImageRepository }}
 {{- else }}
           registry: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}
 {{- end }}
-          repository: ghcr.io/kedacore/keda-metrics-apiserver
+          repository: keda-metrics-apiserver
           tag: "2.19.0"
         webhooks:
 {{- if not (empty $helmRepoRegistry) }}
-          registry: {{ .Values.global.workload.container.image.registry }}/{{ .Values.global.workload.container.image.repository }}
+          registry: {{ $workloadImageRegistry }}/{{ $workloadImageRepository }}
 {{- else }}
           registry: {{ .Values.environment.dockerRegistryAddress }}/{{ .Values.environment.dockerRegistryContext }}
 {{- end }}
-          repository: ghcr.io/kedacore/keda-admission-webhooks
+          repository: keda-admission-webhooks
           tag: "2.19.0"
       imagePullSecrets:
-      - name: sca-docker-registry-secret
+      - name: as360-secret
+
+  - manifestbased-library-search:
+      enabled: true
+      common:
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.ScanMonitorAPI"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
+
+  - manifestbased-library-search-npm:
+      enabled: true
+      common:
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.ScanMonitorAPI"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
+
+  - scaegressgatekeeper:
+      enabled: true
+      common:
+        workload:
+          mainContainer:
+            env:
+              additionalEnvs:
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: ProxySettings__UpstreamProxy__Host
+                value: {{ $upstreamProxyHost | quote }}
+              - name: ProxySettings__UpstreamProxy__Port
+                value: {{ $upstreamProxyPort | quote }}
+              - name: ProxySettings__UpstreamProxy__Username
+                value: {{ $upstreamProxyUsername | quote }}
+              - name: ProxySettings__UpstreamProxy__Password
+                value: {{ $upstreamProxyPassword | quote }}
+              - name: Settings__ExternalDomains
+                value: ''
+              - name: LoggingConfiguration__EnableFileLogging
+                value: "true"
+              - name: LoggingConfiguration__FileLogPath
+                value: "/data/sca180documentstorage/scaegressgatekeeper/"
+
+  - scaenginemanifestbasedcrawler:
+      enabled: true
+      common:
+        scaserviceenv:
+          StorageServiceConfiguration__StorageType: "1"
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.ManifestBasedCrawler"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
+        keda:
+          enabled: false
+
+  - scaenginescanmetadata:
+      enabled: true
+      common:
+        scaserviceenv:
+          TelemetryConfiguration__Enabled: {{ $openTelemetryEnable }}
+          LoggingConfiguration__EnableOtlpLogging: {{ $openTelemetryEnableLogs }}
+          TelemetryConfiguration__MetricsEnabled: {{ $openTelemetryEnableMetrics }}
+          TelemetryConfiguration__Otlp__Endpoint: {{ $openTelemetryEndpoint }}
+          TelemetryConfiguration__ServiceName: "Engine.ScanMetadata"
+          TelemetryConfiguration__AspNetCoreInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__HttpClientInstrumentationEnabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Otlp__Enabled: {{ $openTelemetryEnable }}
+          TelemetryConfiguration__Console__Enabled: {{ $openTelemetryEnable }}
+          StorageServiceConfiguration__StorageType: "1"
+        keda:
+          enabled: {{ .Values.environment.autoscaling | default "false"}}
